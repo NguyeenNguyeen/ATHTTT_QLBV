@@ -260,6 +260,9 @@
             // 
             // tabGrant
             // 
+            tabGrant.Controls.Add(lblGrantGrantee);
+            tabGrant.Controls.Add(lblGrantObjectType);
+            tabGrant.Controls.Add(lblGrantObjectName);
             tabGrant.Controls.Add(cbGrantGrantee);
             tabGrant.Controls.Add(cbGrantObjectType);
             tabGrant.Controls.Add(cbGrantObjectName);
@@ -274,6 +277,34 @@
             tabGrant.TabIndex = 2;
             tabGrant.Text = "Grant";
             tabGrant.UseVisualStyleBackColor = true;
+            // 
+            // lblGrantGrantee
+            // 
+            lblGrantGrantee.AutoSize = true;
+            lblGrantGrantee.Location = new Point(10, 5);
+            lblGrantGrantee.Name = "lblGrantGrantee";
+            lblGrantGrantee.Size = new Size(68, 15);
+            lblGrantGrantee.TabIndex = 0;
+            lblGrantGrantee.Text = "Chọn Grantee:";
+            // 
+            // lblGrantObjectType
+            // 
+            lblGrantObjectType.AutoSize = true;
+            lblGrantObjectType.Location = new Point(250, 5);
+            lblGrantObjectType.Name = "lblGrantObjectType";
+            lblGrantObjectType.Size = new Size(83, 15);
+            lblGrantObjectType.TabIndex = 1;
+            lblGrantObjectType.Text = "Loại Đối tượng:";
+            // 
+            // lblGrantObjectName
+            // 
+            lblGrantObjectName.AutoSize = true;
+            lblGrantObjectName.Location = new Point(450, 5);
+            lblGrantObjectName.Name = "lblGrantObjectName";
+            lblGrantObjectName.Size = new Size(69, 15);
+            lblGrantObjectName.TabIndex = 2;
+            lblGrantObjectName.Text = "Tên đối tượng:";
+            // 
             // 
             // cbGrantGrantee
             // 
@@ -339,6 +370,9 @@
             // 
             // tabRevoke
             // 
+            tabRevoke.Controls.Add(lblRevokeGrantee);
+            tabRevoke.Controls.Add(lblRevokeObjectType);
+            tabRevoke.Controls.Add(lblRevokeObjectName);
             tabRevoke.Controls.Add(cbRevokeGrantee);
             tabRevoke.Controls.Add(cbRevokeObjectType);
             tabRevoke.Controls.Add(cbRevokeObjectName);
@@ -352,6 +386,33 @@
             tabRevoke.TabIndex = 3;
             tabRevoke.Text = "Revoke";
             tabRevoke.UseVisualStyleBackColor = true;
+            // 
+            // lblRevokeGrantee
+            // 
+            lblRevokeGrantee.AutoSize = true;
+            lblRevokeGrantee.Location = new Point(10, 5);
+            lblRevokeGrantee.Name = "lblRevokeGrantee";
+            lblRevokeGrantee.Size = new Size(68, 15);
+            lblRevokeGrantee.TabIndex = 0;
+            lblRevokeGrantee.Text = "Chọn Grantee:";
+            // 
+            // lblRevokeObjectType
+            // 
+            lblRevokeObjectType.AutoSize = true;
+            lblRevokeObjectType.Location = new Point(250, 5);
+            lblRevokeObjectType.Name = "lblRevokeObjectType";
+            lblRevokeObjectType.Size = new Size(83, 15);
+            lblRevokeObjectType.TabIndex = 1;
+            lblRevokeObjectType.Text = "Loại Đối tượng:";
+            // 
+            // lblRevokeObjectName
+            // 
+            lblRevokeObjectName.AutoSize = true;
+            lblRevokeObjectName.Location = new Point(450, 5);
+            lblRevokeObjectName.Name = "lblRevokeObjectName";
+            lblRevokeObjectName.Size = new Size(69, 15);
+            lblRevokeObjectName.Text = "Tên đối tượng:";
+            // 
             // 
             // cbRevokeGrantee
             // 
@@ -408,6 +469,7 @@
             // 
             // tabPrivInfo
             // 
+            tabPrivInfo.Controls.Add(lblPrivInfoGrantee);
             tabPrivInfo.Controls.Add(cbPrivInfoGrantee);
             tabPrivInfo.Controls.Add(btnLoadPrivInfo);
             tabPrivInfo.Controls.Add(dgvPrivInfo);
@@ -418,6 +480,16 @@
             tabPrivInfo.TabIndex = 4;
             tabPrivInfo.Text = "Thông tin quyền";
             tabPrivInfo.UseVisualStyleBackColor = true;
+            // 
+            // lblPrivInfoGrantee
+            // 
+            lblPrivInfoGrantee.AutoSize = true;
+            lblPrivInfoGrantee.Location = new Point(10, 5);
+            lblPrivInfoGrantee.Name = "lblPrivInfoGrantee";
+            lblPrivInfoGrantee.Size = new Size(68, 15);
+            lblPrivInfoGrantee.TabIndex = 0;
+            lblPrivInfoGrantee.Text = "Chọn Grantee:";
+            // 
             // 
             // cbPrivInfoGrantee
             // 

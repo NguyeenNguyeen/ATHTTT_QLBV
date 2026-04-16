@@ -1,0 +1,38 @@
+using Oracle.ManagedDataAccess.Client;
+
+namespace ADMIN
+{
+    public class OracleConfig
+    {
+        private const string Host = "localhost";
+        private const int Port = 1521;
+        private const string ServiceName = "xe"; // Thay "orcl" nếu cần
+        private const string User = "ADMIN_PHANHE1";
+        private const string Password = "Admin@123456";
+
+        /// <summary>
+        /// Tạo chuỗi kết nối Oracle
+        /// </summary>
+        public static string GetConnectionString()
+        {
+            return $"Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST={Host})(PORT={Port}))(CONNECT_DATA=(SERVICE_NAME={ServiceName})));User Id={User};Password={Password};";
+        }
+
+        /// <summary>
+        /// Lấy kết nối Oracle đã mở
+        /// </summary>
+        public static OracleConnection GetConnection()
+        {
+            try
+            {
+                OracleConnection connection = new OracleConnection(GetConnectionString());
+                connection.Open();
+                return connection;
+            }
+            catch (OracleException ex)
+            {
+                throw new Exception($"Lỗi kết nối Oracle: {ex.Message}", ex);
+            }
+        }
+    }
+}

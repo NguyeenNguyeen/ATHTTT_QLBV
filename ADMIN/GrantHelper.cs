@@ -1,0 +1,316 @@
+using Oracle.ManagedDataAccess.Client;
+using System.Data;
+
+namespace ADMIN
+{
+    public class GrantHelper
+    {
+        /// <summary>
+        /// Kiểm tra một tên có phải Role không
+        /// </summary>
+        public static bool IsRole(string name)
+        {
+            try
+            {
+                using (var conn = OracleConfig.GetConnection())
+                {
+                    string query = "SELECT COUNT(*) FROM DBA_ROLES WHERE ROLE = :roleName";
+                    using (OracleCommand cmd = new OracleCommand(query, conn))
+                    {
+                        cmd.Parameters.Add(":roleName", OracleDbType.Varchar2).Value = name.ToUpper();
+                        int count = Convert.ToInt32(cmd.ExecuteScalar());
+                        return count > 0;
+                    }
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Lấy danh sách User/Role có tiền tố C##
+        /// </summary>
+        public static List<string> GetGrantees()
+        {
+            List<string> grantees = new List<string>();
+
+            try
+            {
+                using (var conn = OracleConfig.GetConnection())
+                {
+                    string query = @"
+                        SELECT USERNAME FROM DBA_USERS WHERE USERNAME LIKE 'C##%'
+                        UNION
+                        SELECT ROLE FROM DBA_ROLES WHERE ROLE LIKE 'C##%'
+                        ORDER BY 1";
+
+                    using (OracleCommand cmd = new OracleCommand(query, conn))
+                    {
+                        using (OracleDataReader reader = cmd.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                grantees.Add(reader["USERNAME"].ToString() ?? reader["ROLE"].ToString());
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi lấy danh sách Grantee: {ex.Message}");
+            }
+
+            return grantees;
+        }
+
+        /// <summary>
+        /// Lấy danh sách Đối tượng (Table, View, Procedure, Function)
+        /// </summary>
+        public static List<string> GetObjects(string objectType)
+        {
+            List<string> objects = new List<string>();
+
+            try
+            {
+                using (var conn = OracleConfig.GetConnection())
+                {
+                    string query = objectType switch
+                    {
+                        "TABLE" => "SELECT TABLE_NAME FROM DBA_TABLES WHERE OWNER != 'SYS' AND OWNER != 'SYSTEM' ORDER BY TABLE_NAME",
+                        "VIEW" => "SELECT VIEW_NAME FROM DBA_VIEWS WHERE OWNER != 'SYS' AND OWNER != 'SYSTEM' ORDER BY VIEW_NAME",
+                        "PROCEDURE" => "SELECT OBJECT_NAME FROM DBA_OBJECTS WHERE OBJECT_TYPE = 'PROCEDURE' AND OWNER != 'SYS' AND OWNER != 'SYSTEM' ORDER BY OBJECT_NAME",
+                        "FUNCTION" => "SELECT OBJECT_NAME FROM DBA_OBJECTS WHERE OBJECT_TYPE = 'FUNCTION' AND OWNER != 'SYS' AND OWNER != 'SYSTEM' ORDER BY OBJECT_NAME",
+                        _ => ""
+                    };
+
+                    if (string.IsNullOrEmpty(query))
+                        return objects;
+
+                    using (OracleCommand cmd = new OracleCommand(query, conn))
+                    {
+                        using (OracleDataReader reader = cmd.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                objects.Add(reader[0].ToString());
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi lấy danh sách {objectType}: {ex.Message}");
+            }
+
+            return objects;
+        }
+
+        /// <summary>
+        /// Lấy danh sách cột của một Table hoặc View
+        /// </summary>
+        public static List<string> GetColumns(string objectType, string objectName)
+        {
+            List<string> columns = new List<string>();
+
+            if (objectType != "TABLE" && objectType != "VIEW")
+                return columns;
+
+            try
+            {
+                using (var conn = OracleConfig.GetConnection())
+                {
+                    string query = @"
+                        SELECT COLUMN_NAME FROM DBA_TAB_COLUMNS 
+                        WHERE TABLE_NAME = :tableName 
+                        ORDER BY COLUMN_ID";
+
+                    using (OracleCommand cmd = new OracleCommand(query, conn))
+                    {
+                        cmd.Parameters.Add(":tableName", OracleDbType.Varchar2).Value = objectName.ToUpper();
+
+                        using (OracleDataReader reader = cmd.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                columns.Add(reader["COLUMN_NAME"].ToString());
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi lấy danh sách cột: {ex.Message}");
+            }
+
+            return columns;
+        }
+
+        /// <summary>
+        /// Thực thi lệnh GRANT
+        /// </summary>
+        public static bool ExecuteGrant(string grantee, string objectType, string objectName, 
+                                       List<string> privileges, List<string> columns, bool withGrantOption)
+        {
+            try
+            {
+                // Nếu Grantee là Role, không cho phép WITH GRANT OPTION
+                if (IsRole(grantee))
+                {
+                    withGrantOption = false;
+                    MessageBox.Show("Grantee là Role. WITH GRANT OPTION sẽ không được áp dụng.", "Thông báo");
+                }
+
+                using (var conn = OracleConfig.GetConnection())
+                {
+                    foreach (string privilege in privileges)
+                    {
+                        string grantQuery = objectType switch
+                        {
+                            "TABLE" or "VIEW" => BuildTableViewGrantQuery(grantee, objectType, objectName, privilege, columns, withGrantOption),
+                            "PROCEDURE" => BuildProcedureGrantQuery(grantee, objectName, withGrantOption),
+                            "FUNCTION" => BuildFunctionGrantQuery(grantee, objectName, withGrantOption),
+                            _ => ""
+                        };
+
+                        if (!string.IsNullOrEmpty(grantQuery))
+                        {
+                            using (OracleCommand cmd = new OracleCommand(grantQuery, conn))
+                            {
+                                cmd.ExecuteNonQuery();
+                            }
+                        }
+                    }
+
+                    MessageBox.Show("Cấp quyền thành công!", "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi cấp quyền: {ex.Message}", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Xây dựng câu lệnh GRANT cho TABLE/VIEW
+        /// </summary>
+        private static string BuildTableViewGrantQuery(string grantee, string objectType, string objectName, 
+                                                       string privilege, List<string> columns, bool withGrantOption)
+        {
+            string privilegeClause = "";
+
+            // Quyền cột chỉ áp dụng cho SELECT và UPDATE
+            if ((privilege == "SELECT" || privilege == "UPDATE") && columns.Count > 0)
+            {
+                privilegeClause = $"{privilege}({string.Join(", ", columns)})";
+            }
+            else
+            {
+                privilegeClause = privilege;
+            }
+
+            string grantOption = withGrantOption ? " WITH GRANT OPTION" : "";
+            return $"GRANT {privilegeClause} ON {objectName} TO {grantee}{grantOption}";
+        }
+
+        /// <summary>
+        /// Xây dựng câu lệnh GRANT cho PROCEDURE
+        /// </summary>
+        private static string BuildProcedureGrantQuery(string grantee, string objectName, bool withGrantOption)
+        {
+            string grantOption = withGrantOption ? " WITH GRANT OPTION" : "";
+            return $"GRANT EXECUTE ON {objectName} TO {grantee}{grantOption}";
+        }
+
+        /// <summary>
+        /// Xây dựng câu lệnh GRANT cho FUNCTION
+        /// </summary>
+        private static string BuildFunctionGrantQuery(string grantee, string objectName, bool withGrantOption)
+        {
+            string grantOption = withGrantOption ? " WITH GRANT OPTION" : "";
+            return $"GRANT EXECUTE ON {objectName} TO {grantee}{grantOption}";
+        }
+
+        /// <summary>
+        /// Thực thi lệnh REVOKE
+        /// </summary>
+        public static bool ExecuteRevoke(string grantee, string objectType, string objectName, 
+                                        List<string> privileges, List<string> columns)
+        {
+            try
+            {
+                using (var conn = OracleConfig.GetConnection())
+                {
+                    foreach (string privilege in privileges)
+                    {
+                        string revokeQuery = objectType switch
+                        {
+                            "TABLE" or "VIEW" => BuildTableViewRevokeQuery(grantee, objectType, objectName, privilege, columns),
+                            "PROCEDURE" => BuildProcedureRevokeQuery(grantee, objectName),
+                            "FUNCTION" => BuildFunctionRevokeQuery(grantee, objectName),
+                            _ => ""
+                        };
+
+                        if (!string.IsNullOrEmpty(revokeQuery))
+                        {
+                            using (OracleCommand cmd = new OracleCommand(revokeQuery, conn))
+                            {
+                                cmd.ExecuteNonQuery();
+                            }
+                        }
+                    }
+
+                    MessageBox.Show("Thu hồi quyền thành công!", "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi thu hồi quyền: {ex.Message}", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Xây dựng câu lệnh REVOKE cho TABLE/VIEW
+        /// </summary>
+        private static string BuildTableViewRevokeQuery(string grantee, string objectType, string objectName, 
+                                                        string privilege, List<string> columns)
+        {
+            string privilegeClause = "";
+
+            if ((privilege == "SELECT" || privilege == "UPDATE") && columns.Count > 0)
+            {
+                privilegeClause = $"{privilege}({string.Join(", ", columns)})";
+            }
+            else
+            {
+                privilegeClause = privilege;
+            }
+
+            return $"REVOKE {privilegeClause} ON {objectName} FROM {grantee}";
+        }
+
+        /// <summary>
+        /// Xây dựng câu lệnh REVOKE cho PROCEDURE
+        /// </summary>
+        private static string BuildProcedureRevokeQuery(string grantee, string objectName)
+        {
+            return $"REVOKE EXECUTE ON {objectName} FROM {grantee}";
+        }
+
+        /// <summary>
+        /// Xây dựng câu lệnh REVOKE cho FUNCTION
+        /// </summary>
+        private static string BuildFunctionRevokeQuery(string grantee, string objectName)
+        {
+            return $"REVOKE EXECUTE ON {objectName} FROM {grantee}";
+        }
+    }
+}
