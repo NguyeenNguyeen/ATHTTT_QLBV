@@ -87,6 +87,9 @@
             btnEditRole = new Button();
             btnDeleteRole = new Button();
             tabGrant = new TabPage();
+            lblGrantGrantee = new Label();
+            lblGrantObjectType = new Label();
+            lblGrantObjectName = new Label();
             cbGrantGrantee = new ComboBox();
             cbGrantObjectType = new ComboBox();
             cbGrantObjectName = new ComboBox();
@@ -95,6 +98,9 @@
             chkGrantWithOption = new CheckBox();
             btnGrantExecute = new Button();
             tabRevoke = new TabPage();
+            lblRevokeGrantee = new Label();
+            lblRevokeObjectType = new Label();
+            lblRevokeObjectName = new Label();
             cbRevokeGrantee = new ComboBox();
             cbRevokeObjectType = new ComboBox();
             cbRevokeObjectName = new ComboBox();
@@ -102,6 +108,7 @@
             clbRevokeColumns = new CheckedListBox();
             btnRevokeExecute = new Button();
             tabPrivInfo = new TabPage();
+            lblPrivInfoGrantee = new Label();
             cbPrivInfoGrantee = new ComboBox();
             btnLoadPrivInfo = new Button();
             dgvPrivInfo = new DataGridView();

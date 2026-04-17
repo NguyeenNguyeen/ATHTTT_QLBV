@@ -1,0 +1,432 @@
+﻿using System.Data;
+using System.Text.RegularExpressions;
+using Oracle.ManagedDataAccess.Client;
+
+namespace ADMIN
+{
+    public partial class Form1 : Form
+    {
+        private static readonly Regex OracleIdentifierRegex = new("^[A-Za-z][A-Za-z0-9_$#]*$", RegexOptions.Compiled);
+
+        public Form1()
+        {
+            InitializeComponent();
+        }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+            TestDatabaseConnection();
+            InitializeGrantTab();
+            InitializeGrantRoleTab();
+            InitializeRevokeTab();
+        }
+
+        private void TestDatabaseConnection()
+        {
+            try
+            {
+                using (var conn = OracleConfig.GetConnection())
+                {
+                    MessageBox.Show("Kết nối Database thành công! Bạn có thể bắt đầu làm phần Cấp quyền.");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Lỗi kết nối: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Khởi tạo Tab Grant
+        /// </summary>
+        private void InitializeGrantTab()
+        {
+            // Load danh sách Grantee
+            var grantees = GrantHelper.GetGrantees();
+            cbGrantGrantee.DataSource = grantees;
+
+            // Sự kiện chọn loại đối tượng
+            cbGrantObjectType.SelectedIndexChanged += CbGrantObjectType_SelectedIndexChanged;
+            cbGrantObjectName.SelectedIndexChanged += CbGrantObjectName_SelectedIndexChanged;
+            clbGrantPrivileges.ItemCheck += ClbGrantPrivileges_ItemCheck;
+
+            // Sự kiện button Thực thi GRANT
+            btnGrantExecute.Click += BtnGrantExecute_Click;
+        }
+
+        /// <summary>
+        /// Khởi tạo Tab Grant Role
+        /// </summary>
+        private void InitializeGrantRoleTab()
+        {
+            // Load danh sách Role
+            var roles = GrantHelper.GetRoles();
+            cbGrantRoleRole.DataSource = roles;
+
+            // Load danh sách User
+            var users = GrantHelper.GetUsers();
+            cbGrantRoleUser.DataSource = users;
+
+            // Sự kiện button Thực thi GRANT ROLE
+            btnGrantRoleExecute.Click += BtnGrantRoleExecute_Click;
+            btnRevokeRoleExecute.Click += BtnRevokeRoleExecute_Click;
+        }
+
+        /// <summary>
+        /// Khởi tạo Tab Revoke
+        /// </summary>
+        private void InitializeRevokeTab()
+        {
+            // Load danh sách Grantee
+            var grantees = GrantHelper.GetGrantees();
+            cbRevokeGrantee.DataSource = grantees;
+
+            // Sự kiện chọn loại đối tượng
+            cbRevokeObjectType.SelectedIndexChanged += CbRevokeObjectType_SelectedIndexChanged;
+            cbRevokeObjectName.SelectedIndexChanged += CbRevokeObjectName_SelectedIndexChanged;
+
+            // Sự kiện button Thực thi REVOKE
+            btnRevokeExecute.Click += BtnRevokeExecute_Click;
+        }
+
+        /// <summary>
+        /// Xử lý khi chọn loại đối tượng GRANT
+        /// </summary>
+        private void CbGrantObjectType_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            cbGrantObjectName.DataSource = null;
+            clbGrantColumns.Items.Clear();
+            clbGrantColumns.Visible = false;
+
+            if (cbGrantObjectType.SelectedItem != null)
+            {
+                var objects = GrantHelper.GetObjects(cbGrantObjectType.SelectedItem.ToString());
+                cbGrantObjectName.DataSource = objects;
+            }
+        }
+
+        /// <summary>
+        /// Xử lý khi chọn đối tượng GRANT
+        /// </summary>
+        private void CbGrantObjectName_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            clbGrantColumns.Items.Clear();
+
+            if (cbGrantObjectType.SelectedItem != null && cbGrantObjectName.SelectedItem != null)
+            {
+                string objectType = cbGrantObjectType.SelectedItem.ToString();
+                string objectName = cbGrantObjectName.SelectedItem.ToString();
+
+                if (objectType == "TABLE" || objectType == "VIEW")
+                {
+                    var columns = GrantHelper.GetColumns(objectType, objectName);
+                    foreach (var column in columns)
+                    {
+                        clbGrantColumns.Items.Add(column);
+                    }
+                    clbGrantColumns.Visible = true;
+                }
+                else
+                {
+                    clbGrantColumns.Visible = false;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Xử lý khi chọn quyền GRANT (tự động deselect EXECUTE nếu là TABLE/VIEW)
+        /// </summary>
+        private void ClbGrantPrivileges_ItemCheck(object sender, ItemCheckEventArgs e)
+        {
+            string privilege = clbGrantPrivileges.Items[e.Index].ToString();
+
+            // EXECUTE chỉ dùng cho PROCEDURE và FUNCTION
+            if (privilege == "EXECUTE" && cbGrantObjectType.SelectedItem != null)
+            {
+                string objectType = cbGrantObjectType.SelectedItem.ToString();
+                if (objectType == "TABLE" || objectType == "VIEW")
+                {
+                    MessageBox.Show("Quyền EXECUTE chỉ áp dụng cho PROCEDURE và FUNCTION!", "Thông báo");
+                    e.NewValue = CheckState.Unchecked;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Thực thi lệnh GRANT
+        /// </summary>
+        private void BtnGrantExecute_Click(object sender, EventArgs e)
+        {
+            // 1. Kiểm tra Grantee
+            if (cbGrantGrantee.SelectedItem == null)
+            {
+                MessageBox.Show("Vui lòng chọn Grantee!", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // 2. Kiểm tra loại đối tượng
+            if (cbGrantObjectType.SelectedItem == null)
+            {
+                MessageBox.Show("Vui lòng chọn loại đối tượng!", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // 3. Kiểm tra đối tượng
+            if (cbGrantObjectName.SelectedItem == null)
+            {
+                MessageBox.Show("Vui lòng chọn đối tượng!", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            string grantee = cbGrantGrantee.SelectedItem.ToString();
+            string objectType = cbGrantObjectType.SelectedItem.ToString();
+            string objectName = cbGrantObjectName.SelectedItem.ToString();
+
+            // 4. Lấy quyền được chọn
+            List<string> selectedPrivileges = new List<string>();
+            foreach (int index in clbGrantPrivileges.CheckedIndices)
+            {
+                selectedPrivileges.Add(clbGrantPrivileges.Items[index].ToString());
+            }
+
+            if (selectedPrivileges.Count == 0)
+            {
+                MessageBox.Show("Vui lòng chọn ít nhất một quyền!", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // 5. Kiểm tra quyền hợp lệ theo loại đối tượng
+            if (objectType == "PROCEDURE" || objectType == "FUNCTION")
+            {
+                // Procedure/Function chỉ cho phép EXECUTE
+                var invalidPrivileges = selectedPrivileges.Where(p => p != "EXECUTE").ToList();
+                if (invalidPrivileges.Count > 0)
+                {
+                    MessageBox.Show(
+                        $"{objectType} chỉ hỗ trợ quyền EXECUTE.\nVui lòng bỏ chọn: {string.Join(", ", invalidPrivileges)}",
+                        "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // Nếu là Procedure/Function, chỉ giữ EXECUTE
+                selectedPrivileges = new List<string> { "EXECUTE" };
+            }
+            else if (objectType == "TABLE" || objectType == "VIEW")
+            {
+                // Table/View hỗ trợ SELECT, INSERT, UPDATE, DELETE
+                var validPrivileges = new[] { "SELECT", "INSERT", "UPDATE", "DELETE" };
+                var invalidPrivileges = selectedPrivileges.Where(p => !validPrivileges.Contains(p)).ToList();
+                
+                if (invalidPrivileges.Count > 0)
+                {
+                    MessageBox.Show(
+                        $"{objectType} không hỗ trợ quyền: {string.Join(", ", invalidPrivileges)}\nChỉ hỗ trợ: SELECT, INSERT, UPDATE, DELETE",
+                        "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+            }
+
+            // 6. Lấy cột được chọn (nếu có)
+            List<string> selectedColumns = new List<string>();
+            foreach (int index in clbGrantColumns.CheckedIndices)
+            {
+                selectedColumns.Add(clbGrantColumns.Items[index].ToString());
+            }
+
+            // 7. Kiểm tra phân quyền mức cột
+            if (clbGrantColumns.Visible && selectedColumns.Count > 0)
+            {
+                // Nếu chỉ chọn INSERT/DELETE mà vẫn chọn cột → cảnh báo
+                var hasSelectOrUpdate = selectedPrivileges.Contains("SELECT") || selectedPrivileges.Contains("UPDATE");
+                var hasInsertOrDelete = selectedPrivileges.Contains("INSERT") || selectedPrivileges.Contains("DELETE");
+
+                if (hasInsertOrDelete && !hasSelectOrUpdate)
+                {
+                    MessageBox.Show(
+                        "Quyền INSERT và DELETE KHÔNG hỗ trợ phân quyền mức cột.\nVui lòng bỏ chọn các cột.",
+                        "Cảnh báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+            }
+            else if (clbGrantColumns.Visible && (selectedPrivileges.Contains("SELECT") || selectedPrivileges.Contains("UPDATE")))
+            {
+                // Nếu chọn SELECT hoặc UPDATE mà không chọn cột, cấp quyền cho tất cả cột
+                if (selectedColumns.Count == 0)
+                {
+                    var result = MessageBox.Show(
+                        "Bạn chưa chọn cột. Bạn có muốn cấp quyền cho TẤT CẢ các cột không?",
+                        "Xác nhận", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+                    if (result == DialogResult.No)
+                        return;
+                }
+            }
+
+            // 8. Kiểm tra WITH GRANT OPTION
+            bool withGrantOption = chkGrantWithOption.Checked;
+            if (withGrantOption && GrantHelper.IsRole(grantee))
+            {
+                MessageBox.Show(
+                    "Grantee là Role nên không thể sử dụng WITH GRANT OPTION.\nTùy chọn này sẽ bị bỏ qua.",
+                    "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                withGrantOption = false;
+            }
+
+            // 9. Thực thi GRANT
+            GrantHelper.ExecuteGrant(grantee, objectType, objectName, selectedPrivileges, selectedColumns, withGrantOption);
+        }
+
+        /// <summary>
+        /// Xử lý khi chọn loại đối tượng REVOKE
+        /// </summary>
+        private void CbRevokeObjectType_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            cbRevokeObjectName.DataSource = null;
+            clbRevokeColumns.Items.Clear();
+            clbRevokeColumns.Visible = false;
+
+            if (cbRevokeObjectType.SelectedItem != null)
+            {
+                var objects = GrantHelper.GetObjects(cbRevokeObjectType.SelectedItem.ToString());
+                cbRevokeObjectName.DataSource = objects;
+            }
+        }
+
+        /// <summary>
+        /// Xử lý khi chọn đối tượng REVOKE
+        /// </summary>
+        private void CbRevokeObjectName_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            clbRevokeColumns.Items.Clear();
+
+            if (cbRevokeObjectType.SelectedItem != null && cbRevokeObjectName.SelectedItem != null)
+            {
+                string objectType = cbRevokeObjectType.SelectedItem.ToString();
+                string objectName = cbRevokeObjectName.SelectedItem.ToString();
+
+                if (objectType == "TABLE" || objectType == "VIEW")
+                {
+                    var columns = GrantHelper.GetColumns(objectType, objectName);
+                    foreach (var column in columns)
+                    {
+                        clbRevokeColumns.Items.Add(column);
+                    }
+                    clbRevokeColumns.Visible = true;
+                }
+                else
+                {
+                    clbRevokeColumns.Visible = false;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Thực thi lệnh REVOKE
+        /// </summary>
+        private void BtnRevokeExecute_Click(object sender, EventArgs e)
+        {
+            // 1. Kiểm tra Grantee
+            if (cbRevokeGrantee.SelectedItem == null)
+            {
+                MessageBox.Show("Vui lòng chọn Grantee!", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // 2. Kiểm tra loại đối tượng
+            if (cbRevokeObjectType.SelectedItem == null)
+            {
+                MessageBox.Show("Vui lòng chọn loại đối tượng!", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // 3. Kiểm tra đối tượng
+            if (cbRevokeObjectName.SelectedItem == null)
+            {
+                MessageBox.Show("Vui lòng chọn đối tượng!", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            string grantee = cbRevokeGrantee.SelectedItem.ToString();
+            string objectType = cbRevokeObjectType.SelectedItem.ToString();
+            string objectName = cbRevokeObjectName.SelectedItem.ToString();
+
+            // 4. Lấy quyền được chọn
+            List<string> selectedPrivileges = new List<string>();
+            foreach (int index in clbRevokePrivileges.CheckedIndices)
+            {
+                selectedPrivileges.Add(clbRevokePrivileges.Items[index].ToString());
+            }
+
+            if (selectedPrivileges.Count == 0)
+            {
+                MessageBox.Show("Vui lòng chọn ít nhất một quyền!", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // 5. Kiểm tra quyền hợp lệ theo loại đối tượng
+            if (objectType == "PROCEDURE" || objectType == "FUNCTION")
+            {
+                // Procedure/Function chỉ cho phép EXECUTE
+                var invalidPrivileges = selectedPrivileges.Where(p => p != "EXECUTE").ToList();
+                if (invalidPrivileges.Count > 0)
+                {
+                    MessageBox.Show(
+                        $"{objectType} chỉ hỗ trợ quyền EXECUTE.\nVui lòng bỏ chọn: {string.Join(", ", invalidPrivileges)}",
+                        "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // Nếu là Procedure/Function, chỉ giữ EXECUTE
+                selectedPrivileges = new List<string> { "EXECUTE" };
+            }
+            else if (objectType == "TABLE" || objectType == "VIEW")
+            {
+                // Table/View hỗ trợ SELECT, INSERT, UPDATE, DELETE
+                var validPrivileges = new[] { "SELECT", "INSERT", "UPDATE", "DELETE" };
+                var invalidPrivileges = selectedPrivileges.Where(p => !validPrivileges.Contains(p)).ToList();
+                
+                if (invalidPrivileges.Count > 0)
+                {
+                    MessageBox.Show(
+                        $"{objectType} không hỗ trợ quyền: {string.Join(", ", invalidPrivileges)}\nChỉ hỗ trợ: SELECT, INSERT, UPDATE, DELETE",
+                        "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+            }
+
+            // 6. Lấy cột được chọn (nếu có)
+            List<string> selectedColumns = new List<string>();
+            foreach (int index in clbRevokeColumns.CheckedIndices)
+            {
+                selectedColumns.Add(clbRevokeColumns.Items[index].ToString());
+            }
+
+            // 7. Kiểm tra phân quyền mức cột
+            if (clbRevokeColumns.Visible && selectedColumns.Count > 0)
+            {
+                // Nếu chỉ chọn INSERT/DELETE mà vẫn chọn cột → cảnh báo
+                var hasSelectOrUpdate = selectedPrivileges.Contains("SELECT") || selectedPrivileges.Contains("UPDATE");
+                var hasInsertOrDelete = selectedPrivileges.Contains("INSERT") || selectedPrivileges.Contains("DELETE");
+
+                if (hasInsertOrDelete && !hasSelectOrUpdate)
+                {
+                    MessageBox.Show(
+                        "Quyền INSERT và DELETE KHÔNG hỗ trợ phân quyền mức cột.\nVui lòng bỏ chọn các cột.",
+                        "Cảnh báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+            }
+
+            // 8. Xác nhận trước khi thu hồi quyền
+            var confirmResult = MessageBox.Show(
+                $"Bạn chắc chắn muốn thu hồi quyền {string.Join(", ", selectedPrivileges)} từ {grantee}?",
+                "Xác nhận", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+            if (confirmResult == DialogResult.No)
+                return;
+
+            // 9. Thực thi REVOKE
+            GrantHelper.ExecuteRevoke(grantee, objectType, objectName, selectedPrivileges, selectedColumns);
+        }
+    }
+}

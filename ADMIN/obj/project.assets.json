@@ -48,24 +48,19 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\ngoct\\.nuget\\packages\\": {},
-    "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
+    "C:\\Users\\NGUYEN NHAT LAN\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\Dai_Hoc\\3rd_year\\Semester2\\ATBMHTTT\\Project\\Source\\ADMIN\\ADMIN.csproj",
+      "projectUniqueName": "N:\\ATBMHTTT\\PHONE\\ATHTTT_QLBV\\ADMIN\\ADMIN.csproj",
       "projectName": "ADMIN",
-      "projectPath": "D:\\Dai_Hoc\\3rd_year\\Semester2\\ATBMHTTT\\Project\\Source\\ADMIN\\ADMIN.csproj",
-      "packagesPath": "C:\\Users\\ngoct\\.nuget\\packages\\",
-      "outputPath": "D:\\Dai_Hoc\\3rd_year\\Semester2\\ATBMHTTT\\Project\\Source\\ADMIN\\obj\\",
+      "projectPath": "N:\\ATBMHTTT\\PHONE\\ATHTTT_QLBV\\ADMIN\\ADMIN.csproj",
+      "packagesPath": "C:\\Users\\NGUYEN NHAT LAN\\.nuget\\packages\\",
+      "outputPath": "N:\\ATBMHTTT\\PHONE\\ATHTTT_QLBV\\ADMIN\\obj\\",
       "projectStyle": "PackageReference",
-      "fallbackFolders": [
-        "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
-      ],
       "configFilePaths": [
-        "C:\\Users\\ngoct\\AppData\\Roaming\\NuGet\\NuGet.Config",
-        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+        "C:\\Users\\NGUYEN NHAT LAN\\AppData\\Roaming\\NuGet\\NuGet.Config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
       "originalTargetFrameworks": [
@@ -77,7 +72,6 @@
       },
       "frameworks": {
         "net10.0-windows7.0": {
-          "framework": "net10.0-windows7.0",
           "targetAlias": "net10.0-windows",
           "projectReferences": {}
         }
@@ -96,7 +90,6 @@
     },
     "frameworks": {
       "net10.0-windows7.0": {
-        "framework": "net10.0-windows7.0",
         "targetAlias": "net10.0-windows",
         "dependencies": {
           "Oracle.ManagedDataAccess": {
@@ -425,7 +418,7 @@
       "message": "Package 'Oracle.ManagedDataAccess 23.6.1' was restored using '.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1' instead of the project target framework 'net10.0-windows7.0'. This package may not be fully compatible with your project.",
       "libraryId": "Oracle.ManagedDataAccess",
       "targetGraphs": [
-        "net10.0-windows"
+        "net10.0-windows7.0"
       ]
     }
   ]

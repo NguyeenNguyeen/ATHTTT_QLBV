@@ -1,22 +1,22 @@
 {
   "version": 2,
-  "dgSpecHash": "wjyM0wtgtbE=",
+  "dgSpecHash": "d+mq/HQ+830=",
   "success": true,
-  "projectFilePath": "D:\\Dai_Hoc\\3rd_year\\Semester2\\ATBMHTTT\\Project\\Source\\ADMIN\\ADMIN.csproj",
+  "projectFilePath": "N:\\ATBMHTTT\\PHONE\\ATHTTT_QLBV\\ADMIN\\ADMIN.csproj",
   "expectedPackageFiles": [
-    "C:\\Users\\ngoct\\.nuget\\packages\\oracle.manageddataaccess\\23.6.1\\oracle.manageddataaccess.23.6.1.nupkg.sha512"
+    "C:\\Users\\NGUYEN NHAT LAN\\.nuget\\packages\\oracle.manageddataaccess\\23.6.1\\oracle.manageddataaccess.23.6.1.nupkg.sha512"
   ],
   "logs": [
     {
       "code": "NU1701",
       "level": "Warning",
       "message": "Package 'Oracle.ManagedDataAccess 23.6.1' was restored using '.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1' instead of the project target framework 'net10.0-windows7.0'. This package may not be fully compatible with your project.",
-      "projectPath": "D:\\Dai_Hoc\\3rd_year\\Semester2\\ATBMHTTT\\Project\\Source\\ADMIN\\ADMIN.csproj",
+      "projectPath": "N:\\ATBMHTTT\\PHONE\\ATHTTT_QLBV\\ADMIN\\ADMIN.csproj",
       "warningLevel": 1,
-      "filePath": "D:\\Dai_Hoc\\3rd_year\\Semester2\\ATBMHTTT\\Project\\Source\\ADMIN\\ADMIN.csproj",
+      "filePath": "N:\\ATBMHTTT\\PHONE\\ATHTTT_QLBV\\ADMIN\\ADMIN.csproj",
       "libraryId": "Oracle.ManagedDataAccess",
       "targetGraphs": [
-        "net10.0-windows"
+        "net10.0-windows7.0"
       ]
     }
   ]
