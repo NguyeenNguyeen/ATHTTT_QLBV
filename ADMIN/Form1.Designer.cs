@@ -48,7 +48,8 @@
         private Button btnRevokeExecute;
 
         private Label lblPrivInfoGrantee;
-        private ComboBox cbPrivInfoGrantee;
+        private ComboBox cbPrivilegeType;
+        private TextBox txtSearchPrivUser;
         private Button btnLoadPrivInfo;
         private DataGridView dgvPrivInfo;
 
@@ -104,7 +105,8 @@
             clbRevokeColumns = new CheckedListBox();
             btnRevokeExecute = new Button();
             tabPrivInfo = new TabPage();
-            cbPrivInfoGrantee = new ComboBox();
+            cbPrivilegeType = new ComboBox();
+            txtSearchPrivUser = new TextBox();
             btnLoadPrivInfo = new Button();
             dgvPrivInfo = new DataGridView();
             btnSearch = new Button();
@@ -425,7 +427,8 @@
             // 
             // tabPrivInfo
             // 
-            tabPrivInfo.Controls.Add(cbPrivInfoGrantee);
+            tabPrivInfo.Controls.Add(cbPrivilegeType);
+            tabPrivInfo.Controls.Add(txtSearchPrivUser);
             tabPrivInfo.Controls.Add(btnLoadPrivInfo);
             tabPrivInfo.Controls.Add(dgvPrivInfo);
             tabPrivInfo.Location = new Point(4, 24);
@@ -436,23 +439,38 @@
             tabPrivInfo.Text = "Thông tin quyền";
             tabPrivInfo.UseVisualStyleBackColor = true;
             // 
-            // cbPrivInfoGrantee
+            // cbPrivilegeType
             // 
-            cbPrivInfoGrantee.DropDownStyle = ComboBoxStyle.DropDownList;
-            cbPrivInfoGrantee.Location = new Point(10, 20);
-            cbPrivInfoGrantee.Name = "cbPrivInfoGrantee";
-            cbPrivInfoGrantee.Size = new Size(220, 23);
-            cbPrivInfoGrantee.TabIndex = 0;
+            cbPrivilegeType.DropDownStyle = ComboBoxStyle.DropDownList;
+            cbPrivilegeType.FormattingEnabled = true;
+            cbPrivilegeType.Items.AddRange(new object[] {
+            "Xem quyền trên bảng",
+            "Xem quyền trên cột",
+            "Xem quyền trên view",
+            "Xem quyền trên procedure/function"});
+            cbPrivilegeType.Location = new Point(10, 20);
+            cbPrivilegeType.Name = "cbPrivilegeType";
+            cbPrivilegeType.Size = new Size(200, 23);
+            cbPrivilegeType.TabIndex = 0;
+            // 
+            // txtSearchPrivUser
+            // 
+            txtSearchPrivUser.Location = new Point(220, 20);
+            txtSearchPrivUser.Name = "txtSearchPrivUser";
+            txtSearchPrivUser.PlaceholderText = "Mã user / Role (tuỳ chọn)";
+            txtSearchPrivUser.Size = new Size(200, 23);
+            txtSearchPrivUser.TabIndex = 2;
             // 
             // btnLoadPrivInfo
             // 
             btnLoadPrivInfo.BackColor = Color.LightSkyBlue;
-            btnLoadPrivInfo.Location = new Point(250, 18);
+            btnLoadPrivInfo.Location = new Point(430, 18);
             btnLoadPrivInfo.Name = "btnLoadPrivInfo";
             btnLoadPrivInfo.Size = new Size(140, 27);
             btnLoadPrivInfo.TabIndex = 1;
             btnLoadPrivInfo.Text = "Xem quyền";
             btnLoadPrivInfo.UseVisualStyleBackColor = false;
+            btnLoadPrivInfo.Click += new System.EventHandler(this.btnLoadPrivInfo_Click);
             // 
             // dgvPrivInfo
             // 

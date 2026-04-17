@@ -199,6 +199,80 @@ namespace ADMIN
             }
         }
 
+        private void btnLoadPrivInfo_Click(object sender, EventArgs e)
+        {
+            string privType = cbPrivilegeType.SelectedItem?.ToString() ?? "";
+            string searchUser = txtSearchPrivUser.Text.Trim().ToUpper();
+
+            if (string.IsNullOrEmpty(privType))
+            {
+                MessageBox.Show("Vui lòng chọn loại quyền cần xem (Trên bảng / Trên cột).", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            string connectionString = @"User Id=ADMIN_PHANHE1;Password=Admin@123456;Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=127.0.0.1)(PORT=1521))(CONNECT_DATA=(SERVER=DEDICATED)(SERVICE_NAME=orcl21)));";
+
+            try
+            {
+                using (OracleConnection conn = new OracleConnection(connectionString))
+                {
+                    conn.Open();
+                    using (OracleCommand cmd = new OracleCommand())
+                    {
+                        cmd.Connection = conn;
+                        cmd.CommandType = CommandType.StoredProcedure;
+
+                        if (privType == "Xem quyền trên bảng")
+                        {
+                            cmd.CommandText = "ADMIN_PHANHE1.SP_XEM_QUYEN_ALL_USER";
+                        }
+                        else if (privType == "Xem quyền trên cột")
+                        {
+                            cmd.CommandText = "ADMIN_PHANHE1.SP_XEM_QUYEN_COT_ALL_USER";
+                        }
+                        else if (privType == "Xem quyền trên view")
+                        {
+                            cmd.CommandText = "ADMIN_PHANHE1.SP_XEM_QUYEN_VIEW_ALL_USER";
+                        }
+                        else if (privType == "Xem quyền trên procedure/function")
+                        {
+                            cmd.CommandText = "ADMIN_PHANHE1.SP_XEM_QUYEN_PROC_ALL_USER";
+                        }
+
+                        OracleParameter pCursor = new OracleParameter("p_CURSOR", OracleDbType.RefCursor);
+                        pCursor.Direction = ParameterDirection.Output;
+                        cmd.Parameters.Add(pCursor);
+
+                        using (OracleDataAdapter adapter = new OracleDataAdapter(cmd))
+                        {
+                            DataTable dt = new DataTable();
+                            adapter.Fill(dt);
+
+                            // Lọc dữ liệu theo mã user nếu người dùng có nhập tìm kiếm
+                            if (!string.IsNullOrEmpty(searchUser))
+                            {
+                                // Chú ý: Tên cột phải khớp với alias trả về từ Procedure, ở đây là 'Tên Tài Khoản / Role'
+                                dt.DefaultView.RowFilter = $"[Tên Tài Khoản / Role] LIKE '%{searchUser}%'";
+                                dgvPrivInfo.DataSource = dt.DefaultView;
+                            }
+                            else
+                            {
+                                dgvPrivInfo.DataSource = dt;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (OracleException oex)
+            {
+                MessageBox.Show($"Lỗi Oracle ({oex.Number}): {oex.Message}", "Lỗi Cơ Sở Dữ Liệu", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi Hệ Thống: {ex.Message}", "Lỗi Hệ Thống", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
         public Form1()
         {
             InitializeComponent();
