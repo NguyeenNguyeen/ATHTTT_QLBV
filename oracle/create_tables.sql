@@ -99,3 +99,54 @@ CREATE TABLE DONTHUOC (
     CONSTRAINT FK_DONTHUOC_HSBA FOREIGN KEY (MAHSBA) REFERENCES HSBA(MAHSBA)
 );
 
+-- Cập nhật thông tin Nhân viên
+-- Lệnh xóa (Nếu chưa có sẽ báo lỗi ORA-04043, bạn cứ bỏ qua không sao nhé)
+DROP PROCEDURE ADMIN_PHANHE1.SP_SUA_NHANVIEN;
+
+-- Lệnh tạo mới
+CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_SUA_NHANVIEN (
+    p_MANV IN VARCHAR2, -- Mã NV dùng để xác định người cần sửa
+    p_HOTEN IN NVARCHAR2,
+    p_PHAI IN NVARCHAR2,
+    p_NGAYSINH IN DATE,
+    p_CMND IN VARCHAR2,
+    p_QUEQUAN IN NVARCHAR2,
+    p_SODT IN VARCHAR2,
+    p_VAITRO IN NVARCHAR2,
+    p_CHUYENKHOA IN NVARCHAR2,
+    p_COSO IN NVARCHAR2,
+    p_MATKHAU IN VARCHAR2 -- Nhận mật khẩu mới (có thể rỗng)
+)
+AUTHID CURRENT_USER
+IS
+    v_sql VARCHAR2(500);
+BEGIN
+    -- Bước 1: Cập nhật thông tin cá nhân trong bảng NHANVIEN
+    UPDATE ADMIN_PHANHE1.NHANVIEN 
+    SET HOTEN = p_HOTEN,
+        PHAI = p_PHAI,
+        NGAYSINH = p_NGAYSINH,
+        CMND = p_CMND,
+        QUEQUAN = p_QUEQUAN,
+        SODT = p_SODT,
+        VAITRO = p_VAITRO,
+        CHUYENKHOA = p_CHUYENKHOA,
+        COSO = p_COSO
+    WHERE MANV = p_MANV;
+
+    -- Bước 2: Đổi mật khẩu tài khoản Oracle (Nếu người dùng có nhập mật khẩu trên Form)
+    IF p_MATKHAU IS NOT NULL AND TRIM(p_MATKHAU) <> '' THEN
+        v_sql := 'ALTER USER C##' || p_MANV || ' IDENTIFIED BY ""' || p_MATKHAU || '""';
+        EXECUTE IMMEDIATE v_sql;
+    END IF;
+
+    -- Hoàn tất và lưu dữ liệu
+    COMMIT;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        -- Hoàn tác nếu có bất kỳ lỗi gì xảy ra (ví dụ: vi phạm ràng buộc dữ liệu)
+        ROLLBACK;
+        RAISE;
+END;
+/
