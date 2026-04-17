@@ -52,6 +52,8 @@
         private Button btnLoadPrivInfo;
         private DataGridView dgvPrivInfo;
 
+        private ComboBox cbUserType;
+
         /// <summary>
         ///  Clean up any resources being used.
         /// </summary>
@@ -106,6 +108,7 @@
             btnLoadPrivInfo = new Button();
             dgvPrivInfo = new DataGridView();
             btnSearch = new Button();
+            cbUserType = new ComboBox();
             tabMain.SuspendLayout();
             tabUsers.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dgvUsers).BeginInit();
@@ -133,6 +136,7 @@
             // 
             // tabUsers
             // 
+            tabUsers.Controls.Add(cbUserType);
             tabUsers.Controls.Add(dgvUsers);
             tabUsers.Controls.Add(txtUserName);
             tabUsers.Controls.Add(btnSearch);
@@ -159,41 +163,54 @@
             // 
             // txtUserName
             // 
-            txtUserName.Location = new Point(13, 21);
+            txtUserName.Location = new Point(10, 20);
             txtUserName.Name = "txtUserName";
             txtUserName.PlaceholderText = "Mã user";
             txtUserName.Size = new Size(200, 23);
             txtUserName.TabIndex = 1;
             // 
+            // cbUserType
+            // 
+            cbUserType.DropDownStyle = ComboBoxStyle.DropDownList;
+            cbUserType.FormattingEnabled = true;
+            cbUserType.Items.AddRange(new object[] { "Nhân viên", "Bệnh nhân" });
+            cbUserType.Location = new Point(220, 20);
+            cbUserType.Name = "cbUserType";
+            cbUserType.Size = new Size(130, 23);
+            cbUserType.TabIndex = 2;
+            // 
             // btnAddUser
             // 
             btnAddUser.BackColor = Color.LightGreen;
-            btnAddUser.Location = new Point(923, 17);
+            btnAddUser.Location = new Point(460, 18);
             btnAddUser.Name = "btnAddUser";
             btnAddUser.Size = new Size(90, 27);
-            btnAddUser.TabIndex = 3;
+            btnAddUser.TabIndex = 10;
             btnAddUser.Text = "Thêm";
             btnAddUser.UseVisualStyleBackColor = false;
+            btnAddUser.Click += new System.EventHandler(this.btnAddUser_Click);
             // 
             // btnEditUser
             // 
             btnEditUser.BackColor = Color.LightGoldenrodYellow;
-            btnEditUser.Location = new Point(450, 18);
+            btnEditUser.Location = new Point(560, 18);
             btnEditUser.Name = "btnEditUser";
             btnEditUser.Size = new Size(90, 27);
             btnEditUser.TabIndex = 4;
             btnEditUser.Text = "Sửa";
             btnEditUser.UseVisualStyleBackColor = false;
+            btnEditUser.Click += new System.EventHandler(this.btnEditUser_Click);
             // 
             // btnDeleteUser
             // 
             btnDeleteUser.BackColor = Color.LightCoral;
-            btnDeleteUser.Location = new Point(578, 18);
+            btnDeleteUser.Location = new Point(660, 18);
             btnDeleteUser.Name = "btnDeleteUser";
             btnDeleteUser.Size = new Size(90, 27);
             btnDeleteUser.TabIndex = 5;
             btnDeleteUser.Text = "Xóa";
             btnDeleteUser.UseVisualStyleBackColor = false;
+            btnDeleteUser.Click += new System.EventHandler(this.btnDeleteUser_Click);
             // 
             // tabRoles
             // 
@@ -450,12 +467,13 @@
             // btnSearch
             // 
             btnSearch.BackColor = Color.LightGreen;
-            btnSearch.Location = new Point(330, 18);
+            btnSearch.Location = new Point(360, 18);
             btnSearch.Name = "btnSearch";
             btnSearch.Size = new Size(90, 27);
             btnSearch.TabIndex = 3;
             btnSearch.Text = "Tìm kiếm";
             btnSearch.UseVisualStyleBackColor = false;
+            btnSearch.Click += new System.EventHandler(this.btnSearch_Click);
             // 
             // Form1
             // 
