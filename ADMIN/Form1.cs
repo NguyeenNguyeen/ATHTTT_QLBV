@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Data;
 using System.Text.RegularExpressions;
 using Oracle.ManagedDataAccess.Client;
@@ -452,6 +453,140 @@ namespace ADMIN
                         $"User/Role: {grantee}\n" +
                         $"Quyền: {privilege}\n" +
                         $"Đối tượng: {objectName}\n" +
+                        $"Lỗi: {errorMsg}\n" +
+                        $"{new string('=', 80)}\n";
+                    
+                    System.IO.File.AppendAllText(logFile, logContent);
+                }
+                catch { }
+
+                MessageBox.Show(errorMsg, "Lỗi Cơ Sở Dữ Liệu", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi Hệ Thống: {ex.Message}\n\nStack Trace:\n{ex.StackTrace}", "Lỗi Hệ Thống", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// Sự kiện thu hồi quyền (Nhiệm vụ 4)
+        /// Gọi procedure ADMIN_PHANHE1.SP_REVOKE_PRIVILEGE để thu hồi quyền từ User/Role
+        /// </summary>
+        private void btnRevokeExecute_Click(object sender, EventArgs e)
+        {
+            // Kiểm tra input
+            string grantee = cbRevokeGrantee.SelectedItem?.ToString()?.Trim() ?? "";
+            
+            if (string.IsNullOrEmpty(grantee))
+            {
+                MessageBox.Show("Vui lòng chọn User/Role cần thu hồi quyền.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Lấy danh sách quyền được chọn từ clbRevokePrivileges
+            var selectedPrivileges = new List<string>();
+            foreach (int index in clbRevokePrivileges.CheckedIndices)
+            {
+                selectedPrivileges.Add(clbRevokePrivileges.Items[index]?.ToString() ?? "");
+            }
+
+            if (selectedPrivileges.Count == 0)
+            {
+                MessageBox.Show("Vui lòng chọn quyền cần thu hồi (SELECT, INSERT, UPDATE, DELETE, EXECUTE).", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Xác nhận trước khi thực thi
+            DialogResult confirmResult = MessageBox.Show(
+                $"Bạn có chắc chắn muốn thu hồi quyền này từ {grantee}?",
+                "Xác nhận thu hồi quyền",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning
+            );
+
+            if (confirmResult != DialogResult.Yes)
+            {
+                return;
+            }
+
+            // Kết nối Oracle
+            string connectionString = @"User Id=ADMIN_PHANHE1;Password=Admin@123456;Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=127.0.0.1)(PORT=1521))(CONNECT_DATA=(SERVER=DEDICATED)(SERVICE_NAME=orcl21)));";
+
+            try
+            {
+                using (OracleConnection conn = new OracleConnection(connectionString))
+                {
+                    conn.Open();
+                    
+                    // Lặp qua từng quyền được chọn và gọi procedure
+                    foreach (string privilege in selectedPrivileges)
+                    {
+                        using (OracleCommand cmd = new OracleCommand())
+                        {
+                            cmd.Connection = conn;
+                            cmd.CommandType = CommandType.StoredProcedure;
+                            cmd.CommandText = "ADMIN_PHANHE1.SP_REVOKE_PRIVILEGE";
+
+                            // Thêm các tham số
+                            cmd.Parameters.Add("p_GRANTEE", OracleDbType.Varchar2).Value = grantee;
+                            cmd.Parameters.Add("p_PRIVILEGE", OracleDbType.Varchar2).Value = privilege;
+
+                            // Xử lý p_OBJECT_NAME:
+                            // Nếu đang thu hồi Role (privilege không phải quyền SQL tiêu chuẩn), p_OBJECT_NAME = null
+                            // Nếu đang thu hồi quyền trên đối tượng, lấy từ cbRevokeObjectName
+                            string objectName = cbRevokeObjectName.SelectedItem?.ToString()?.Trim() ?? "";
+                            
+                            if (string.IsNullOrEmpty(objectName))
+                            {
+                                cmd.Parameters.Add("p_OBJECT_NAME", OracleDbType.Varchar2).Value = DBNull.Value;
+                            }
+                            else
+                            {
+                                cmd.Parameters.Add("p_OBJECT_NAME", OracleDbType.Varchar2).Value = objectName;
+                            }
+
+                            // Thực thi procedure
+                            cmd.ExecuteNonQuery();
+                        }
+                    }
+
+                    // Thành công
+                    MessageBox.Show(
+                        $"✓ Thu hồi quyền thành công!\n\n" +
+                        $"User/Role: {grantee}\n" +
+                        $"Quyền: {string.Join(", ", selectedPrivileges)}" +
+                        (cbRevokeObjectName.SelectedItem != null ? $"\nĐối tượng: {cbRevokeObjectName.SelectedItem}" : "\nĐối tượng: (Không áp dụng)"),
+                        "Thu Hồi Quyền Thành Công",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information
+                    );
+
+                    // Reload tab thông tin quyền
+                    if (tabMain != null && tabMain.TabPages.Count > 4)
+                    {
+                        btnLoadPrivInfo_Click(sender, e);
+                    }
+
+                    // Xóa input sau khi thành công
+                    cbRevokeGrantee.SelectedIndex = -1;
+                    cbRevokeObjectType.SelectedIndex = -1;
+                    cbRevokeObjectName.SelectedIndex = -1;
+                    clbRevokePrivileges.ClearSelected();
+                    clbRevokeColumns.ClearSelected();
+                }
+            }
+            catch (OracleException oex)
+            {
+                string errorMsg = $"Lỗi Oracle ({oex.Number}):\n{oex.Message}";
+                
+                // Log lỗi ra file
+                try
+                {
+                    string logFile = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "Oracle_Error_Log.txt");
+                    string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                    string logContent = $"[{timestamp}] REVOKE PRIVILEGE ERROR\n" +
+                        $"User/Role: {grantee}\n" +
+                        $"Quyền: {string.Join(", ", selectedPrivileges)}\n" +
                         $"Lỗi: {errorMsg}\n" +
                         $"{new string('=', 80)}\n";
                     

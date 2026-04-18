@@ -424,6 +424,7 @@
             btnRevokeExecute.TabIndex = 5;
             btnRevokeExecute.Text = "Thực thi REVOKE";
             btnRevokeExecute.UseVisualStyleBackColor = false;
+            btnRevokeExecute.Click += new System.EventHandler(this.btnRevokeExecute_Click);
             // 
             // tabPrivInfo
             // 
