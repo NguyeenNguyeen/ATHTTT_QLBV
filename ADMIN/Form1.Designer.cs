@@ -29,22 +29,27 @@
         private Label lblGrantGrantee;
         private Label lblGrantObjectType;
         private Label lblGrantObjectName;
+        private Label lblGrantPrivileges;
+        private Label lblGrantColumnLevel;
         private ComboBox cbGrantGrantee;
         private ComboBox cbGrantObjectType;
         private ComboBox cbGrantObjectName;
         private CheckedListBox clbGrantPrivileges;
         private CheckedListBox clbGrantColumns;
         private CheckBox chkGrantWithOption;
+        private CheckBox chkGrantColumnLevel;
         private Button btnGrantExecute;
 
         private Label lblRevokeGrantee;
         private Label lblRevokeObjectType;
         private Label lblRevokeObjectName;
+        private Label lblRevokeColumnLevel;
         private ComboBox cbRevokeGrantee;
         private ComboBox cbRevokeObjectType;
         private ComboBox cbRevokeObjectName;
         private CheckedListBox clbRevokePrivileges;
         private CheckedListBox clbRevokeColumns;
+        private CheckBox chkRevokeColumnLevel;
         private Button btnRevokeExecute;
 
         private Label lblPrivInfoGrantee;
@@ -96,13 +101,24 @@
             clbGrantPrivileges = new CheckedListBox();
             clbGrantColumns = new CheckedListBox();
             chkGrantWithOption = new CheckBox();
+            chkGrantColumnLevel = new CheckBox();
             btnGrantExecute = new Button();
+            lblGrantGrantee = new Label();
+            lblGrantObjectType = new Label();
+            lblGrantObjectName = new Label();
+            lblGrantPrivileges = new Label();
+            lblGrantColumnLevel = new Label();
             tabRevoke = new TabPage();
+            lblRevokeGrantee = new Label();
+            lblRevokeObjectType = new Label();
+            lblRevokeObjectName = new Label();
+            lblRevokeColumnLevel = new Label();
             cbRevokeGrantee = new ComboBox();
             cbRevokeObjectType = new ComboBox();
             cbRevokeObjectName = new ComboBox();
             clbRevokePrivileges = new CheckedListBox();
             clbRevokeColumns = new CheckedListBox();
+            chkRevokeColumnLevel = new CheckBox();
             btnRevokeExecute = new Button();
             tabPrivInfo = new TabPage();
             cbPrivilegeType = new ComboBox();
@@ -279,12 +295,18 @@
             // 
             // tabGrant
             // 
+            tabGrant.Controls.Add(lblGrantGrantee);
+            tabGrant.Controls.Add(lblGrantObjectType);
+            tabGrant.Controls.Add(lblGrantObjectName);
+            tabGrant.Controls.Add(lblGrantPrivileges);
+            tabGrant.Controls.Add(lblGrantColumnLevel);
             tabGrant.Controls.Add(cbGrantGrantee);
             tabGrant.Controls.Add(cbGrantObjectType);
             tabGrant.Controls.Add(cbGrantObjectName);
             tabGrant.Controls.Add(clbGrantPrivileges);
             tabGrant.Controls.Add(clbGrantColumns);
             tabGrant.Controls.Add(chkGrantWithOption);
+            tabGrant.Controls.Add(chkGrantColumnLevel);
             tabGrant.Controls.Add(btnGrantExecute);
             tabGrant.Location = new Point(4, 24);
             tabGrant.Name = "tabGrant";
@@ -293,6 +315,41 @@
             tabGrant.TabIndex = 2;
             tabGrant.Text = "Grant";
             tabGrant.UseVisualStyleBackColor = true;
+            // 
+            // lblGrantGrantee
+            // 
+            lblGrantGrantee.AutoSize = true;
+            lblGrantGrantee.Location = new Point(10, 5);
+            lblGrantGrantee.Name = "lblGrantGrantee";
+            lblGrantGrantee.Text = "Grantee (User/Role):";
+            // 
+            // lblGrantObjectType
+            // 
+            lblGrantObjectType.AutoSize = true;
+            lblGrantObjectType.Location = new Point(250, 5);
+            lblGrantObjectType.Name = "lblGrantObjectType";
+            lblGrantObjectType.Text = "Loại đối tượng:";
+            // 
+            // lblGrantObjectName
+            // 
+            lblGrantObjectName.AutoSize = true;
+            lblGrantObjectName.Location = new Point(450, 5);
+            lblGrantObjectName.Name = "lblGrantObjectName";
+            lblGrantObjectName.Text = "Tên đối tượng:";
+            // 
+            // lblGrantPrivileges
+            // 
+            lblGrantPrivileges.AutoSize = true;
+            lblGrantPrivileges.Location = new Point(10, 50);
+            lblGrantPrivileges.Name = "lblGrantPrivileges";
+            lblGrantPrivileges.Text = "Quyền:";
+            // 
+            // lblGrantColumnLevel
+            // 
+            lblGrantColumnLevel.AutoSize = true;
+            lblGrantColumnLevel.Location = new Point(210, 50);
+            lblGrantColumnLevel.Name = "lblGrantColumnLevel";
+            lblGrantColumnLevel.Text = "Cột (nếu muốn):";
             // 
             // cbGrantGrantee
             // 
@@ -346,6 +403,22 @@
             chkGrantWithOption.Text = "WITH GRANT OPTION";
             chkGrantWithOption.UseVisualStyleBackColor = true;
             // 
+            // chkGrantColumnLevel
+            // 
+            chkGrantColumnLevel.Location = new Point(450, 95);
+            chkGrantColumnLevel.Name = "chkGrantColumnLevel";
+            chkGrantColumnLevel.Size = new Size(220, 24);
+            chkGrantColumnLevel.TabIndex = 6;
+            chkGrantColumnLevel.Text = "Phân quyền cấp cột (chọn cột bên trên)";
+            chkGrantColumnLevel.UseVisualStyleBackColor = true;
+            chkGrantColumnLevel.CheckedChanged += new System.EventHandler(this.chkGrantColumnLevel_CheckedChanged);
+            // 
+            // cbGrantObjectType
+            //
+            cbGrantObjectType.SelectedIndexChanged += new System.EventHandler(this.cbGrantObjectType_SelectedIndexChanged);
+            // cbGrantObjectName
+            //
+            cbGrantObjectName.SelectedIndexChanged += new System.EventHandler(this.cbGrantObjectName_SelectedIndexChanged);
             // btnGrantExecute
             // 
             btnGrantExecute.BackColor = Color.LightGreen;
@@ -355,14 +428,20 @@
             btnGrantExecute.TabIndex = 6;
             btnGrantExecute.Text = "Thực thi GRANT";
             btnGrantExecute.UseVisualStyleBackColor = false;
+            btnGrantExecute.Click += new System.EventHandler(this.btnGrantExecute_Click);
             // 
             // tabRevoke
             // 
+            tabRevoke.Controls.Add(lblRevokeGrantee);
+            tabRevoke.Controls.Add(lblRevokeObjectType);
+            tabRevoke.Controls.Add(lblRevokeObjectName);
+            tabRevoke.Controls.Add(lblRevokeColumnLevel);
             tabRevoke.Controls.Add(cbRevokeGrantee);
             tabRevoke.Controls.Add(cbRevokeObjectType);
             tabRevoke.Controls.Add(cbRevokeObjectName);
             tabRevoke.Controls.Add(clbRevokePrivileges);
             tabRevoke.Controls.Add(clbRevokeColumns);
+            tabRevoke.Controls.Add(chkRevokeColumnLevel);
             tabRevoke.Controls.Add(btnRevokeExecute);
             tabRevoke.Location = new Point(4, 24);
             tabRevoke.Name = "tabRevoke";
@@ -371,6 +450,34 @@
             tabRevoke.TabIndex = 3;
             tabRevoke.Text = "Revoke";
             tabRevoke.UseVisualStyleBackColor = true;
+            // 
+            // lblRevokeGrantee
+            // 
+            lblRevokeGrantee.AutoSize = true;
+            lblRevokeGrantee.Location = new Point(10, 5);
+            lblRevokeGrantee.Name = "lblRevokeGrantee";
+            lblRevokeGrantee.Text = "Grantee (User/Role):";
+            // 
+            // lblRevokeObjectType
+            // 
+            lblRevokeObjectType.AutoSize = true;
+            lblRevokeObjectType.Location = new Point(250, 5);
+            lblRevokeObjectType.Name = "lblRevokeObjectType";
+            lblRevokeObjectType.Text = "Loại đối tượng:";
+            // 
+            // lblRevokeObjectName
+            // 
+            lblRevokeObjectName.AutoSize = true;
+            lblRevokeObjectName.Location = new Point(450, 5);
+            lblRevokeObjectName.Name = "lblRevokeObjectName";
+            lblRevokeObjectName.Text = "Tên đối tượng:";
+            // 
+            // lblRevokeColumnLevel
+            // 
+            lblRevokeColumnLevel.AutoSize = true;
+            lblRevokeColumnLevel.Location = new Point(210, 50);
+            lblRevokeColumnLevel.Name = "lblRevokeColumnLevel";
+            lblRevokeColumnLevel.Text = "Cột (nếu muốn):";
             // 
             // cbRevokeGrantee
             // 
@@ -388,6 +495,7 @@
             cbRevokeObjectType.Name = "cbRevokeObjectType";
             cbRevokeObjectType.Size = new Size(180, 23);
             cbRevokeObjectType.TabIndex = 1;
+            cbRevokeObjectType.SelectedIndexChanged += new System.EventHandler(this.cbRevokeObjectType_SelectedIndexChanged);
             // 
             // cbRevokeObjectName
             // 
@@ -396,6 +504,17 @@
             cbRevokeObjectName.Name = "cbRevokeObjectName";
             cbRevokeObjectName.Size = new Size(220, 23);
             cbRevokeObjectName.TabIndex = 2;
+            cbRevokeObjectName.SelectedIndexChanged += new System.EventHandler(this.cbRevokeObjectName_SelectedIndexChanged);
+            // 
+            // chkRevokeColumnLevel
+            // 
+            chkRevokeColumnLevel.Location = new Point(450, 95);
+            chkRevokeColumnLevel.Name = "chkRevokeColumnLevel";
+            chkRevokeColumnLevel.Size = new Size(220, 24);
+            chkRevokeColumnLevel.TabIndex = 6;
+            chkRevokeColumnLevel.Text = "Phân quyền cấp cột (chọn cột bên trên)";
+            chkRevokeColumnLevel.UseVisualStyleBackColor = true;
+            chkRevokeColumnLevel.CheckedChanged += new System.EventHandler(this.chkRevokeColumnLevel_CheckedChanged);
             // 
             // clbRevokePrivileges
             // 
@@ -424,6 +543,7 @@
             btnRevokeExecute.TabIndex = 5;
             btnRevokeExecute.Text = "Thực thi REVOKE";
             btnRevokeExecute.UseVisualStyleBackColor = false;
+            btnRevokeExecute.Click += new System.EventHandler(this.btnRevokeExecute_Click);
             // 
             // tabPrivInfo
             // 

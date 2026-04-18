@@ -8,6 +8,7 @@ namespace ADMIN
     {
         private const string ConnectionString = "User Id=SYSTEM;Password=oracle;Data Source=localhost:1521/orcl21";
         private static readonly Regex OracleIdentifierRegex = new("^[A-Za-z][A-Za-z0-9_$#]*$", RegexOptions.Compiled);
+        private PermissionManager _permManager = new PermissionManager();
 
         private void btnAddUser_Click(object sender, EventArgs e)
         {
@@ -273,9 +274,270 @@ namespace ADMIN
             }
         }
 
+        private void LoadGranteeList()
+        {
+            try
+            {
+                var grantees = _permManager.GetAllGrantees();
+                cbGrantGrantee.Items.Clear();
+                cbRevokeGrantee.Items.Clear();
+                foreach (var grantee in grantees)
+                {
+                    cbGrantGrantee.Items.Add(grantee);
+                    cbRevokeGrantee.Items.Add(grantee);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi tải danh sách Grantee: {ex.Message}");
+            }
+        }
+
+        private void LoadObjectNames(string objectType, ComboBox targetCombo)
+        {
+            try
+            {
+                var objects = _permManager.GetObjectNamesByType(objectType);
+                targetCombo.Items.Clear();
+                foreach (var obj in objects)
+                    targetCombo.Items.Add(obj);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi tải danh sách đối tượng: {ex.Message}");
+            }
+        }
+
+        private void LoadColumns(string tableName, CheckedListBox targetList)
+        {
+            try
+            {
+                var columns = _permManager.GetColumnsOfTable(tableName);
+                targetList.Items.Clear();
+                foreach (var col in columns)
+                    targetList.Items.Add(col);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi tải cột: {ex.Message}");
+            }
+        }
+
+        private void cbGrantObjectType_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            string selectedType = cbGrantObjectType.SelectedItem?.ToString() ?? "";
+            LoadObjectNames(selectedType, cbGrantObjectName);
+            clbGrantPrivileges.Items.Clear();
+            
+            // Ẩn checkbox phân quyền cấp cột nếu không phải TABLE/VIEW
+            if (selectedType == "TABLE" || selectedType == "VIEW")
+            {
+                clbGrantPrivileges.Items.AddRange(new object[] { "SELECT", "INSERT", "UPDATE", "DELETE" });
+                chkGrantColumnLevel.Visible = true;
+                clbGrantColumns.Visible = chkGrantColumnLevel.Checked;
+            }
+            else if (selectedType == "PROCEDURE" || selectedType == "FUNCTION")
+            {
+                clbGrantPrivileges.Items.Add("EXECUTE");
+                chkGrantColumnLevel.Visible = false;
+                clbGrantColumns.Visible = false;
+            }
+            
+            chkGrantColumnLevel.Checked = false; // Reset khi đổi object type
+        }
+
+        private void cbGrantObjectName_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            string objType = cbGrantObjectType.SelectedItem?.ToString() ?? "";
+            string objName = cbGrantObjectName.SelectedItem?.ToString() ?? "";
+            
+            // Chỉ load columns khi checkbox "phân quyền cấp cột" được check
+            if (chkGrantColumnLevel.Checked && (objType == "TABLE" || objType == "VIEW") && !string.IsNullOrEmpty(objName))
+                LoadColumns(objName, clbGrantColumns);
+        }
+
+        private void chkGrantColumnLevel_CheckedChanged(object sender, EventArgs e)
+        {
+            string objType = cbGrantObjectType.SelectedItem?.ToString() ?? "";
+            string objName = cbGrantObjectName.SelectedItem?.ToString() ?? "";
+            
+            if (chkGrantColumnLevel.Checked)
+            {
+                // Hiện column list khi check
+                clbGrantColumns.Visible = true;
+                if (!string.IsNullOrEmpty(objName))
+                    LoadColumns(objName, clbGrantColumns);
+            }
+            else
+            {
+                // Ẩn column list khi uncheck
+                clbGrantColumns.Visible = false;
+                clbGrantColumns.Items.Clear();
+            }
+        }
+
+        private void cbRevokeObjectType_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            string selectedType = cbRevokeObjectType.SelectedItem?.ToString() ?? "";
+            LoadObjectNames(selectedType, cbRevokeObjectName);
+            clbRevokePrivileges.Items.Clear();
+            
+            if (selectedType == "TABLE" || selectedType == "VIEW")
+            {
+                clbRevokePrivileges.Items.AddRange(new object[] { "SELECT", "INSERT", "UPDATE", "DELETE" });
+                chkRevokeColumnLevel.Visible = true;
+                clbRevokeColumns.Visible = chkRevokeColumnLevel.Checked;
+            }
+            else if (selectedType == "PROCEDURE" || selectedType == "FUNCTION")
+            {
+                clbRevokePrivileges.Items.Add("EXECUTE");
+                chkRevokeColumnLevel.Visible = false;
+                clbRevokeColumns.Visible = false;
+            }
+            
+            chkRevokeColumnLevel.Checked = false;
+        }
+
+        private void cbRevokeObjectName_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            string objType = cbRevokeObjectType.SelectedItem?.ToString() ?? "";
+            string objName = cbRevokeObjectName.SelectedItem?.ToString() ?? "";
+            
+            if (chkRevokeColumnLevel.Checked && (objType == "TABLE" || objType == "VIEW") && !string.IsNullOrEmpty(objName))
+                LoadColumns(objName, clbRevokeColumns);
+        }
+
+        private void chkRevokeColumnLevel_CheckedChanged(object sender, EventArgs e)
+        {
+            string objType = cbRevokeObjectType.SelectedItem?.ToString() ?? "";
+            string objName = cbRevokeObjectName.SelectedItem?.ToString() ?? "";
+            
+            if (chkRevokeColumnLevel.Checked)
+            {
+                clbRevokeColumns.Visible = true;
+                if (!string.IsNullOrEmpty(objName))
+                    LoadColumns(objName, clbRevokeColumns);
+            }
+            else
+            {
+                clbRevokeColumns.Visible = false;
+                clbRevokeColumns.Items.Clear();
+            }
+        }
+
+        private void btnGrantExecute_Click(object sender, EventArgs e)
+        {
+            string grantee = cbGrantGrantee.SelectedItem?.ToString() ?? "";
+            string objType = cbGrantObjectType.SelectedItem?.ToString() ?? "";
+            string objName = cbGrantObjectName.SelectedItem?.ToString() ?? "";
+
+            if (string.IsNullOrEmpty(grantee) || string.IsNullOrEmpty(objType) || string.IsNullOrEmpty(objName))
+            {
+                MessageBox.Show("Vui lòng chọn Grantee, Loại đối tượng và Tên đối tượng", "Thông báo");
+                return;
+            }
+
+            if (clbGrantPrivileges.CheckedItems.Count == 0)
+            {
+                MessageBox.Show("Vui lòng chọn ít nhất 1 quyền", "Thông báo");
+                return;
+            }
+
+            // Kiểm tra: nếu check "Phân quyền cấp cột" thì phải chọn ít nhất 1 cột
+            if (chkGrantColumnLevel.Checked && clbGrantColumns.CheckedItems.Count == 0)
+            {
+                MessageBox.Show("Bạn đã chọn 'Phân quyền cấp cột' nhưng chưa chọn cột nào.\n\nVui lòng:\n- Chọn cột cụ thể, hoặc\n- Bỏ check 'Phân quyền cấp cột' để cấp quyền trên toàn bảng", "Thông báo");
+                return;
+            }
+
+            try
+            {
+                int successCount = 0;
+                foreach (string privilege in clbGrantPrivileges.CheckedItems)
+                {
+                    // Nếu cấp quyền cấp cột (chỉ cho SELECT/UPDATE)
+                    if (chkGrantColumnLevel.Checked && (privilege == "SELECT" || privilege == "UPDATE"))
+                    {
+                        // Gọi SP_GRANT_QUYEN_COT cho từng cột
+                        foreach (string column in clbGrantColumns.CheckedItems)
+                        {
+                            _permManager.GrantColumnPrivilege(objName, column, grantee, privilege);
+                            successCount++;
+                        }
+                    }
+                    else
+                    {
+                        // Cấp quyền table-level (hoặc INSERT/DELETE/EXECUTE)
+                        _permManager.GrantPrivilege(grantee, privilege, objName, "", chkGrantWithOption.Checked);
+                        successCount++;
+                    }
+                }
+                MessageBox.Show($"Cấp quyền thành công cho {grantee}! ({successCount} quyền)", "Thông báo");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi cấp quyền: {ex.Message}", "Lỗi");
+            }
+        }
+
+        private void btnRevokeExecute_Click(object sender, EventArgs e)
+        {
+            string grantee = cbRevokeGrantee.SelectedItem?.ToString() ?? "";
+            string objType = cbRevokeObjectType.SelectedItem?.ToString() ?? "";
+            string objName = cbRevokeObjectName.SelectedItem?.ToString() ?? "";
+
+            if (string.IsNullOrEmpty(grantee) || string.IsNullOrEmpty(objType) || string.IsNullOrEmpty(objName))
+            {
+                MessageBox.Show("Vui lòng chọn Grantee, Loại đối tượng và Tên đối tượng", "Thông báo");
+                return;
+            }
+
+            if (clbRevokePrivileges.CheckedItems.Count == 0)
+            {
+                MessageBox.Show("Vui lòng chọn ít nhất 1 quyền để thu hồi", "Thông báo");
+                return;
+            }
+
+            // Kiểm tra: nếu check "Phân quyền cấp cột" thì phải chọn ít nhất 1 cột
+            if (chkRevokeColumnLevel.Checked && clbRevokeColumns.CheckedItems.Count == 0)
+            {
+                MessageBox.Show("Bạn đã chọn 'Phân quyền cấp cột' nhưng chưa chọn cột nào.\n\nVui lòng:\n- Chọn cột cụ thể, hoặc\n- Bỏ check 'Phân quyền cấp cột' để thu hồi quyền trên toàn bảng", "Thông báo");
+                return;
+            }
+
+            try
+            {
+                int successCount = 0;
+                foreach (string privilege in clbRevokePrivileges.CheckedItems)
+                {
+                    _permManager.RevokePrivilege(grantee, privilege, objName);
+                    successCount++;
+                }
+                MessageBox.Show($"Thu hồi quyền thành công từ {grantee}! ({successCount} quyền)", "Thông báo");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi thu hồi quyền: {ex.Message}", "Lỗi");
+            }
+        }
+
         public Form1()
         {
             InitializeComponent();
+            LoadGranteeList();
+            InitializePermissionLevelControls();
+        }
+
+        private void InitializePermissionLevelControls()
+        {
+            // Ẩn checkbox phân quyền cấp cột ban đầu
+            chkGrantColumnLevel.Visible = false;
+            chkGrantColumnLevel.Checked = false;
+            clbGrantColumns.Visible = false;
+            
+            chkRevokeColumnLevel.Visible = false;
+            chkRevokeColumnLevel.Checked = false;
+            clbRevokeColumns.Visible = false;
         }
     }
 }
