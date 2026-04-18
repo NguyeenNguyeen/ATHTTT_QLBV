@@ -83,8 +83,10 @@
         {
             tabMain = new TabControl();
             tabUsers = new TabPage();
+            cbUserType = new ComboBox();
             dgvUsers = new DataGridView();
             txtUserName = new TextBox();
+            btnSearch = new Button();
             btnAddUser = new Button();
             btnEditUser = new Button();
             btnDeleteUser = new Button();
@@ -95,6 +97,11 @@
             btnEditRole = new Button();
             btnDeleteRole = new Button();
             tabGrant = new TabPage();
+            lblGrantGrantee = new Label();
+            lblGrantObjectType = new Label();
+            lblGrantObjectName = new Label();
+            lblGrantPrivileges = new Label();
+            lblGrantColumnLevel = new Label();
             cbGrantGrantee = new ComboBox();
             cbGrantObjectType = new ComboBox();
             cbGrantObjectName = new ComboBox();
@@ -103,11 +110,6 @@
             chkGrantWithOption = new CheckBox();
             chkGrantColumnLevel = new CheckBox();
             btnGrantExecute = new Button();
-            lblGrantGrantee = new Label();
-            lblGrantObjectType = new Label();
-            lblGrantObjectName = new Label();
-            lblGrantPrivileges = new Label();
-            lblGrantColumnLevel = new Label();
             tabRevoke = new TabPage();
             lblRevokeGrantee = new Label();
             lblRevokeObjectType = new Label();
@@ -125,8 +127,6 @@
             txtSearchPrivUser = new TextBox();
             btnLoadPrivInfo = new Button();
             dgvPrivInfo = new DataGridView();
-            btnSearch = new Button();
-            cbUserType = new ComboBox();
             tabMain.SuspendLayout();
             tabUsers.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dgvUsers).BeginInit();
@@ -147,9 +147,10 @@
             tabMain.Controls.Add(tabPrivInfo);
             tabMain.Dock = DockStyle.Fill;
             tabMain.Location = new Point(0, 0);
+            tabMain.Margin = new Padding(3, 4, 3, 4);
             tabMain.Name = "tabMain";
             tabMain.SelectedIndex = 0;
-            tabMain.Size = new Size(1100, 700);
+            tabMain.Size = new Size(1257, 933);
             tabMain.TabIndex = 0;
             // 
             // tabUsers
@@ -161,74 +162,95 @@
             tabUsers.Controls.Add(btnAddUser);
             tabUsers.Controls.Add(btnEditUser);
             tabUsers.Controls.Add(btnDeleteUser);
-            tabUsers.Location = new Point(4, 24);
+            tabUsers.Location = new Point(4, 29);
+            tabUsers.Margin = new Padding(3, 4, 3, 4);
             tabUsers.Name = "tabUsers";
-            tabUsers.Padding = new Padding(10);
-            tabUsers.Size = new Size(1092, 672);
+            tabUsers.Padding = new Padding(11, 13, 11, 13);
+            tabUsers.Size = new Size(1249, 900);
             tabUsers.TabIndex = 0;
             tabUsers.Text = "User";
             tabUsers.UseVisualStyleBackColor = true;
-            // 
-            // dgvUsers
-            // 
-            dgvUsers.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-            dgvUsers.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            dgvUsers.Location = new Point(10, 120);
-            dgvUsers.Name = "dgvUsers";
-            dgvUsers.ReadOnly = true;
-            dgvUsers.Size = new Size(1072, 542);
-            dgvUsers.TabIndex = 0;
-            // 
-            // txtUserName
-            // 
-            txtUserName.Location = new Point(10, 20);
-            txtUserName.Name = "txtUserName";
-            txtUserName.PlaceholderText = "Mã user";
-            txtUserName.Size = new Size(200, 23);
-            txtUserName.TabIndex = 1;
             // 
             // cbUserType
             // 
             cbUserType.DropDownStyle = ComboBoxStyle.DropDownList;
             cbUserType.FormattingEnabled = true;
             cbUserType.Items.AddRange(new object[] { "Nhân viên", "Bệnh nhân" });
-            cbUserType.Location = new Point(220, 20);
+            cbUserType.Location = new Point(251, 27);
+            cbUserType.Margin = new Padding(3, 4, 3, 4);
             cbUserType.Name = "cbUserType";
-            cbUserType.Size = new Size(130, 23);
+            cbUserType.Size = new Size(148, 28);
             cbUserType.TabIndex = 2;
+            // 
+            // dgvUsers
+            // 
+            dgvUsers.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            dgvUsers.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            dgvUsers.ColumnHeadersHeight = 29;
+            dgvUsers.Location = new Point(11, 160);
+            dgvUsers.Margin = new Padding(3, 4, 3, 4);
+            dgvUsers.Name = "dgvUsers";
+            dgvUsers.ReadOnly = true;
+            dgvUsers.RowHeadersWidth = 51;
+            dgvUsers.Size = new Size(1225, 723);
+            dgvUsers.TabIndex = 0;
+            // 
+            // txtUserName
+            // 
+            txtUserName.Location = new Point(11, 27);
+            txtUserName.Margin = new Padding(3, 4, 3, 4);
+            txtUserName.Name = "txtUserName";
+            txtUserName.PlaceholderText = "Mã user";
+            txtUserName.Size = new Size(228, 27);
+            txtUserName.TabIndex = 1;
+            // 
+            // btnSearch
+            // 
+            btnSearch.BackColor = Color.LightGreen;
+            btnSearch.Location = new Point(411, 24);
+            btnSearch.Margin = new Padding(3, 4, 3, 4);
+            btnSearch.Name = "btnSearch";
+            btnSearch.Size = new Size(103, 36);
+            btnSearch.TabIndex = 3;
+            btnSearch.Text = "Tìm kiếm";
+            btnSearch.UseVisualStyleBackColor = false;
+            btnSearch.Click += btnSearch_Click;
             // 
             // btnAddUser
             // 
             btnAddUser.BackColor = Color.LightGreen;
-            btnAddUser.Location = new Point(460, 18);
+            btnAddUser.Location = new Point(526, 24);
+            btnAddUser.Margin = new Padding(3, 4, 3, 4);
             btnAddUser.Name = "btnAddUser";
-            btnAddUser.Size = new Size(90, 27);
+            btnAddUser.Size = new Size(103, 36);
             btnAddUser.TabIndex = 10;
             btnAddUser.Text = "Thêm";
             btnAddUser.UseVisualStyleBackColor = false;
-            btnAddUser.Click += new System.EventHandler(this.btnAddUser_Click);
+            btnAddUser.Click += btnAddUser_Click;
             // 
             // btnEditUser
             // 
             btnEditUser.BackColor = Color.LightGoldenrodYellow;
-            btnEditUser.Location = new Point(560, 18);
+            btnEditUser.Location = new Point(640, 24);
+            btnEditUser.Margin = new Padding(3, 4, 3, 4);
             btnEditUser.Name = "btnEditUser";
-            btnEditUser.Size = new Size(90, 27);
+            btnEditUser.Size = new Size(103, 36);
             btnEditUser.TabIndex = 4;
             btnEditUser.Text = "Sửa";
             btnEditUser.UseVisualStyleBackColor = false;
-            btnEditUser.Click += new System.EventHandler(this.btnEditUser_Click);
+            btnEditUser.Click += btnEditUser_Click;
             // 
             // btnDeleteUser
             // 
             btnDeleteUser.BackColor = Color.LightCoral;
-            btnDeleteUser.Location = new Point(660, 18);
+            btnDeleteUser.Location = new Point(754, 24);
+            btnDeleteUser.Margin = new Padding(3, 4, 3, 4);
             btnDeleteUser.Name = "btnDeleteUser";
-            btnDeleteUser.Size = new Size(90, 27);
+            btnDeleteUser.Size = new Size(103, 36);
             btnDeleteUser.TabIndex = 5;
             btnDeleteUser.Text = "Xóa";
             btnDeleteUser.UseVisualStyleBackColor = false;
-            btnDeleteUser.Click += new System.EventHandler(this.btnDeleteUser_Click);
+            btnDeleteUser.Click += btnDeleteUser_Click;
             // 
             // tabRoles
             // 
@@ -237,10 +259,11 @@
             tabRoles.Controls.Add(btnAddRole);
             tabRoles.Controls.Add(btnEditRole);
             tabRoles.Controls.Add(btnDeleteRole);
-            tabRoles.Location = new Point(4, 24);
+            tabRoles.Location = new Point(4, 29);
+            tabRoles.Margin = new Padding(3, 4, 3, 4);
             tabRoles.Name = "tabRoles";
-            tabRoles.Padding = new Padding(10);
-            tabRoles.Size = new Size(1092, 672);
+            tabRoles.Padding = new Padding(11, 13, 11, 13);
+            tabRoles.Size = new Size(1249, 900);
             tabRoles.TabIndex = 1;
             tabRoles.Text = "Role";
             tabRoles.UseVisualStyleBackColor = true;
@@ -249,26 +272,31 @@
             // 
             dgvRoles.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             dgvRoles.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            dgvRoles.Location = new Point(10, 120);
+            dgvRoles.ColumnHeadersHeight = 29;
+            dgvRoles.Location = new Point(11, 160);
+            dgvRoles.Margin = new Padding(3, 4, 3, 4);
             dgvRoles.Name = "dgvRoles";
             dgvRoles.ReadOnly = true;
-            dgvRoles.Size = new Size(1072, 542);
+            dgvRoles.RowHeadersWidth = 51;
+            dgvRoles.Size = new Size(1225, 723);
             dgvRoles.TabIndex = 0;
             // 
             // txtRoleName
             // 
-            txtRoleName.Location = new Point(10, 20);
+            txtRoleName.Location = new Point(11, 27);
+            txtRoleName.Margin = new Padding(3, 4, 3, 4);
             txtRoleName.Name = "txtRoleName";
             txtRoleName.PlaceholderText = "Tên role";
-            txtRoleName.Size = new Size(200, 23);
+            txtRoleName.Size = new Size(228, 27);
             txtRoleName.TabIndex = 1;
             // 
             // btnAddRole
             // 
             btnAddRole.BackColor = Color.LightGreen;
-            btnAddRole.Location = new Point(220, 18);
+            btnAddRole.Location = new Point(251, 24);
+            btnAddRole.Margin = new Padding(3, 4, 3, 4);
             btnAddRole.Name = "btnAddRole";
-            btnAddRole.Size = new Size(90, 27);
+            btnAddRole.Size = new Size(103, 36);
             btnAddRole.TabIndex = 2;
             btnAddRole.Text = "Thêm";
             btnAddRole.UseVisualStyleBackColor = false;
@@ -276,9 +304,10 @@
             // btnEditRole
             // 
             btnEditRole.BackColor = Color.LightGoldenrodYellow;
-            btnEditRole.Location = new Point(320, 18);
+            btnEditRole.Location = new Point(366, 24);
+            btnEditRole.Margin = new Padding(3, 4, 3, 4);
             btnEditRole.Name = "btnEditRole";
-            btnEditRole.Size = new Size(90, 27);
+            btnEditRole.Size = new Size(103, 36);
             btnEditRole.TabIndex = 3;
             btnEditRole.Text = "Sửa";
             btnEditRole.UseVisualStyleBackColor = false;
@@ -286,9 +315,10 @@
             // btnDeleteRole
             // 
             btnDeleteRole.BackColor = Color.LightCoral;
-            btnDeleteRole.Location = new Point(420, 18);
+            btnDeleteRole.Location = new Point(480, 24);
+            btnDeleteRole.Margin = new Padding(3, 4, 3, 4);
             btnDeleteRole.Name = "btnDeleteRole";
-            btnDeleteRole.Size = new Size(90, 27);
+            btnDeleteRole.Size = new Size(103, 36);
             btnDeleteRole.TabIndex = 4;
             btnDeleteRole.Text = "Xóa";
             btnDeleteRole.UseVisualStyleBackColor = false;
@@ -308,10 +338,11 @@
             tabGrant.Controls.Add(chkGrantWithOption);
             tabGrant.Controls.Add(chkGrantColumnLevel);
             tabGrant.Controls.Add(btnGrantExecute);
-            tabGrant.Location = new Point(4, 24);
+            tabGrant.Location = new Point(4, 29);
+            tabGrant.Margin = new Padding(3, 4, 3, 4);
             tabGrant.Name = "tabGrant";
-            tabGrant.Padding = new Padding(10);
-            tabGrant.Size = new Size(1092, 672);
+            tabGrant.Padding = new Padding(11, 13, 11, 13);
+            tabGrant.Size = new Size(1249, 900);
             tabGrant.TabIndex = 2;
             tabGrant.Text = "Grant";
             tabGrant.UseVisualStyleBackColor = true;
@@ -319,116 +350,131 @@
             // lblGrantGrantee
             // 
             lblGrantGrantee.AutoSize = true;
-            lblGrantGrantee.Location = new Point(10, 5);
+            lblGrantGrantee.Location = new Point(11, 7);
             lblGrantGrantee.Name = "lblGrantGrantee";
+            lblGrantGrantee.Size = new Size(143, 20);
+            lblGrantGrantee.TabIndex = 0;
             lblGrantGrantee.Text = "Grantee (User/Role):";
             // 
             // lblGrantObjectType
             // 
             lblGrantObjectType.AutoSize = true;
-            lblGrantObjectType.Location = new Point(250, 5);
+            lblGrantObjectType.Location = new Point(286, 7);
             lblGrantObjectType.Name = "lblGrantObjectType";
+            lblGrantObjectType.Size = new Size(110, 20);
+            lblGrantObjectType.TabIndex = 1;
             lblGrantObjectType.Text = "Loại đối tượng:";
             // 
             // lblGrantObjectName
             // 
             lblGrantObjectName.AutoSize = true;
-            lblGrantObjectName.Location = new Point(450, 5);
+            lblGrantObjectName.Location = new Point(514, 7);
             lblGrantObjectName.Name = "lblGrantObjectName";
+            lblGrantObjectName.Size = new Size(105, 20);
+            lblGrantObjectName.TabIndex = 2;
             lblGrantObjectName.Text = "Tên đối tượng:";
             // 
             // lblGrantPrivileges
             // 
             lblGrantPrivileges.AutoSize = true;
-            lblGrantPrivileges.Location = new Point(10, 50);
+            lblGrantPrivileges.Location = new Point(11, 67);
             lblGrantPrivileges.Name = "lblGrantPrivileges";
+            lblGrantPrivileges.Size = new Size(54, 20);
+            lblGrantPrivileges.TabIndex = 3;
             lblGrantPrivileges.Text = "Quyền:";
             // 
             // lblGrantColumnLevel
             // 
             lblGrantColumnLevel.AutoSize = true;
-            lblGrantColumnLevel.Location = new Point(210, 50);
+            lblGrantColumnLevel.Location = new Point(240, 67);
             lblGrantColumnLevel.Name = "lblGrantColumnLevel";
+            lblGrantColumnLevel.Size = new Size(115, 20);
+            lblGrantColumnLevel.TabIndex = 4;
             lblGrantColumnLevel.Text = "Cột (nếu muốn):";
             // 
             // cbGrantGrantee
             // 
             cbGrantGrantee.DropDownStyle = ComboBoxStyle.DropDownList;
-            cbGrantGrantee.Location = new Point(10, 20);
+            cbGrantGrantee.Location = new Point(11, 27);
+            cbGrantGrantee.Margin = new Padding(3, 4, 3, 4);
             cbGrantGrantee.Name = "cbGrantGrantee";
-            cbGrantGrantee.Size = new Size(220, 23);
+            cbGrantGrantee.Size = new Size(251, 28);
             cbGrantGrantee.TabIndex = 0;
             // 
             // cbGrantObjectType
             // 
             cbGrantObjectType.DropDownStyle = ComboBoxStyle.DropDownList;
             cbGrantObjectType.Items.AddRange(new object[] { "TABLE", "VIEW", "PROCEDURE", "FUNCTION" });
-            cbGrantObjectType.Location = new Point(250, 20);
+            cbGrantObjectType.Location = new Point(286, 27);
+            cbGrantObjectType.Margin = new Padding(3, 4, 3, 4);
             cbGrantObjectType.Name = "cbGrantObjectType";
-            cbGrantObjectType.Size = new Size(180, 23);
+            cbGrantObjectType.Size = new Size(205, 28);
             cbGrantObjectType.TabIndex = 1;
+            cbGrantObjectType.SelectedIndexChanged += cbGrantObjectType_SelectedIndexChanged;
             // 
             // cbGrantObjectName
             // 
             cbGrantObjectName.DropDownStyle = ComboBoxStyle.DropDownList;
-            cbGrantObjectName.Location = new Point(450, 20);
+            cbGrantObjectName.Location = new Point(514, 27);
+            cbGrantObjectName.Margin = new Padding(3, 4, 3, 4);
             cbGrantObjectName.Name = "cbGrantObjectName";
-            cbGrantObjectName.Size = new Size(220, 23);
+            cbGrantObjectName.Size = new Size(251, 28);
             cbGrantObjectName.TabIndex = 2;
+            cbGrantObjectName.SelectedIndexChanged += cbGrantObjectName_SelectedIndexChanged;
             // 
             // clbGrantPrivileges
             // 
             clbGrantPrivileges.CheckOnClick = true;
             clbGrantPrivileges.Items.AddRange(new object[] { "SELECT", "INSERT", "UPDATE", "DELETE", "EXECUTE" });
-            clbGrantPrivileges.Location = new Point(10, 70);
+            clbGrantPrivileges.Location = new Point(11, 93);
+            clbGrantPrivileges.Margin = new Padding(3, 4, 3, 4);
             clbGrantPrivileges.Name = "clbGrantPrivileges";
-            clbGrantPrivileges.Size = new Size(180, 130);
+            clbGrantPrivileges.Size = new Size(205, 158);
             clbGrantPrivileges.TabIndex = 3;
+            clbGrantPrivileges.ItemCheck += clbGrantPrivileges_ItemCheck;
             // 
             // clbGrantColumns
             // 
             clbGrantColumns.CheckOnClick = true;
-            clbGrantColumns.Location = new Point(210, 70);
+            clbGrantColumns.Location = new Point(240, 93);
+            clbGrantColumns.Margin = new Padding(3, 4, 3, 4);
             clbGrantColumns.Name = "clbGrantColumns";
-            clbGrantColumns.Size = new Size(220, 130);
+            clbGrantColumns.Size = new Size(251, 158);
             clbGrantColumns.TabIndex = 4;
             clbGrantColumns.Visible = false;
             // 
             // chkGrantWithOption
             // 
-            chkGrantWithOption.Location = new Point(450, 70);
+            chkGrantWithOption.Location = new Point(514, 93);
+            chkGrantWithOption.Margin = new Padding(3, 4, 3, 4);
             chkGrantWithOption.Name = "chkGrantWithOption";
-            chkGrantWithOption.Size = new Size(180, 24);
+            chkGrantWithOption.Size = new Size(206, 32);
             chkGrantWithOption.TabIndex = 5;
             chkGrantWithOption.Text = "WITH GRANT OPTION";
             chkGrantWithOption.UseVisualStyleBackColor = true;
             // 
             // chkGrantColumnLevel
             // 
-            chkGrantColumnLevel.Location = new Point(450, 95);
+            chkGrantColumnLevel.Location = new Point(514, 127);
+            chkGrantColumnLevel.Margin = new Padding(3, 4, 3, 4);
             chkGrantColumnLevel.Name = "chkGrantColumnLevel";
-            chkGrantColumnLevel.Size = new Size(220, 24);
+            chkGrantColumnLevel.Size = new Size(251, 32);
             chkGrantColumnLevel.TabIndex = 6;
             chkGrantColumnLevel.Text = "Phân quyền cấp cột (chọn cột bên trên)";
             chkGrantColumnLevel.UseVisualStyleBackColor = true;
-            chkGrantColumnLevel.CheckedChanged += new System.EventHandler(this.chkGrantColumnLevel_CheckedChanged);
+            chkGrantColumnLevel.CheckedChanged += chkGrantColumnLevel_CheckedChanged;
             // 
-            // cbGrantObjectType
-            //
-            cbGrantObjectType.SelectedIndexChanged += new System.EventHandler(this.cbGrantObjectType_SelectedIndexChanged);
-            // cbGrantObjectName
-            //
-            cbGrantObjectName.SelectedIndexChanged += new System.EventHandler(this.cbGrantObjectName_SelectedIndexChanged);
             // btnGrantExecute
             // 
             btnGrantExecute.BackColor = Color.LightGreen;
-            btnGrantExecute.Location = new Point(450, 110);
+            btnGrantExecute.Location = new Point(514, 147);
+            btnGrantExecute.Margin = new Padding(3, 4, 3, 4);
             btnGrantExecute.Name = "btnGrantExecute";
-            btnGrantExecute.Size = new Size(180, 30);
+            btnGrantExecute.Size = new Size(206, 40);
             btnGrantExecute.TabIndex = 6;
             btnGrantExecute.Text = "Thực thi GRANT";
             btnGrantExecute.UseVisualStyleBackColor = false;
-            btnGrantExecute.Click += new System.EventHandler(this.btnGrantExecute_Click);
+            btnGrantExecute.Click += btnGrantExecute_Click;
             // 
             // tabRevoke
             // 
@@ -443,10 +489,11 @@
             tabRevoke.Controls.Add(clbRevokeColumns);
             tabRevoke.Controls.Add(chkRevokeColumnLevel);
             tabRevoke.Controls.Add(btnRevokeExecute);
-            tabRevoke.Location = new Point(4, 24);
+            tabRevoke.Location = new Point(4, 29);
+            tabRevoke.Margin = new Padding(3, 4, 3, 4);
             tabRevoke.Name = "tabRevoke";
-            tabRevoke.Padding = new Padding(10);
-            tabRevoke.Size = new Size(1092, 672);
+            tabRevoke.Padding = new Padding(11, 13, 11, 13);
+            tabRevoke.Size = new Size(1249, 900);
             tabRevoke.TabIndex = 3;
             tabRevoke.Text = "Revoke";
             tabRevoke.UseVisualStyleBackColor = true;
@@ -454,96 +501,112 @@
             // lblRevokeGrantee
             // 
             lblRevokeGrantee.AutoSize = true;
-            lblRevokeGrantee.Location = new Point(10, 5);
+            lblRevokeGrantee.Location = new Point(11, 7);
             lblRevokeGrantee.Name = "lblRevokeGrantee";
+            lblRevokeGrantee.Size = new Size(143, 20);
+            lblRevokeGrantee.TabIndex = 0;
             lblRevokeGrantee.Text = "Grantee (User/Role):";
             // 
             // lblRevokeObjectType
             // 
             lblRevokeObjectType.AutoSize = true;
-            lblRevokeObjectType.Location = new Point(250, 5);
+            lblRevokeObjectType.Location = new Point(286, 7);
             lblRevokeObjectType.Name = "lblRevokeObjectType";
+            lblRevokeObjectType.Size = new Size(110, 20);
+            lblRevokeObjectType.TabIndex = 1;
             lblRevokeObjectType.Text = "Loại đối tượng:";
             // 
             // lblRevokeObjectName
             // 
             lblRevokeObjectName.AutoSize = true;
-            lblRevokeObjectName.Location = new Point(450, 5);
+            lblRevokeObjectName.Location = new Point(514, 7);
             lblRevokeObjectName.Name = "lblRevokeObjectName";
+            lblRevokeObjectName.Size = new Size(105, 20);
+            lblRevokeObjectName.TabIndex = 2;
             lblRevokeObjectName.Text = "Tên đối tượng:";
             // 
             // lblRevokeColumnLevel
             // 
             lblRevokeColumnLevel.AutoSize = true;
-            lblRevokeColumnLevel.Location = new Point(210, 50);
+            lblRevokeColumnLevel.Location = new Point(240, 67);
             lblRevokeColumnLevel.Name = "lblRevokeColumnLevel";
+            lblRevokeColumnLevel.Size = new Size(115, 20);
+            lblRevokeColumnLevel.TabIndex = 3;
             lblRevokeColumnLevel.Text = "Cột (nếu muốn):";
             // 
             // cbRevokeGrantee
             // 
             cbRevokeGrantee.DropDownStyle = ComboBoxStyle.DropDownList;
-            cbRevokeGrantee.Location = new Point(10, 20);
+            cbRevokeGrantee.Location = new Point(11, 27);
+            cbRevokeGrantee.Margin = new Padding(3, 4, 3, 4);
             cbRevokeGrantee.Name = "cbRevokeGrantee";
-            cbRevokeGrantee.Size = new Size(220, 23);
+            cbRevokeGrantee.Size = new Size(251, 28);
             cbRevokeGrantee.TabIndex = 0;
             // 
             // cbRevokeObjectType
             // 
             cbRevokeObjectType.DropDownStyle = ComboBoxStyle.DropDownList;
             cbRevokeObjectType.Items.AddRange(new object[] { "TABLE", "VIEW", "PROCEDURE", "FUNCTION" });
-            cbRevokeObjectType.Location = new Point(250, 20);
+            cbRevokeObjectType.Location = new Point(286, 27);
+            cbRevokeObjectType.Margin = new Padding(3, 4, 3, 4);
             cbRevokeObjectType.Name = "cbRevokeObjectType";
-            cbRevokeObjectType.Size = new Size(180, 23);
+            cbRevokeObjectType.Size = new Size(205, 28);
             cbRevokeObjectType.TabIndex = 1;
-            cbRevokeObjectType.SelectedIndexChanged += new System.EventHandler(this.cbRevokeObjectType_SelectedIndexChanged);
+            cbRevokeObjectType.SelectedIndexChanged += cbRevokeObjectType_SelectedIndexChanged;
             // 
             // cbRevokeObjectName
             // 
             cbRevokeObjectName.DropDownStyle = ComboBoxStyle.DropDownList;
-            cbRevokeObjectName.Location = new Point(450, 20);
+            cbRevokeObjectName.Location = new Point(514, 27);
+            cbRevokeObjectName.Margin = new Padding(3, 4, 3, 4);
             cbRevokeObjectName.Name = "cbRevokeObjectName";
-            cbRevokeObjectName.Size = new Size(220, 23);
+            cbRevokeObjectName.Size = new Size(251, 28);
             cbRevokeObjectName.TabIndex = 2;
-            cbRevokeObjectName.SelectedIndexChanged += new System.EventHandler(this.cbRevokeObjectName_SelectedIndexChanged);
-            // 
-            // chkRevokeColumnLevel
-            // 
-            chkRevokeColumnLevel.Location = new Point(450, 95);
-            chkRevokeColumnLevel.Name = "chkRevokeColumnLevel";
-            chkRevokeColumnLevel.Size = new Size(220, 24);
-            chkRevokeColumnLevel.TabIndex = 6;
-            chkRevokeColumnLevel.Text = "Phân quyền cấp cột (chọn cột bên trên)";
-            chkRevokeColumnLevel.UseVisualStyleBackColor = true;
-            chkRevokeColumnLevel.CheckedChanged += new System.EventHandler(this.chkRevokeColumnLevel_CheckedChanged);
+            cbRevokeObjectName.SelectedIndexChanged += cbRevokeObjectName_SelectedIndexChanged;
             // 
             // clbRevokePrivileges
             // 
             clbRevokePrivileges.CheckOnClick = true;
             clbRevokePrivileges.Items.AddRange(new object[] { "SELECT", "INSERT", "UPDATE", "DELETE", "EXECUTE" });
-            clbRevokePrivileges.Location = new Point(10, 70);
+            clbRevokePrivileges.Location = new Point(11, 93);
+            clbRevokePrivileges.Margin = new Padding(3, 4, 3, 4);
             clbRevokePrivileges.Name = "clbRevokePrivileges";
-            clbRevokePrivileges.Size = new Size(180, 130);
+            clbRevokePrivileges.Size = new Size(205, 158);
             clbRevokePrivileges.TabIndex = 3;
+            clbRevokePrivileges.ItemCheck += clbRevokePrivileges_ItemCheck;
             // 
             // clbRevokeColumns
             // 
             clbRevokeColumns.CheckOnClick = true;
-            clbRevokeColumns.Location = new Point(210, 70);
+            clbRevokeColumns.Location = new Point(240, 93);
+            clbRevokeColumns.Margin = new Padding(3, 4, 3, 4);
             clbRevokeColumns.Name = "clbRevokeColumns";
-            clbRevokeColumns.Size = new Size(220, 130);
+            clbRevokeColumns.Size = new Size(251, 158);
             clbRevokeColumns.TabIndex = 4;
             clbRevokeColumns.Visible = false;
+            // 
+            // chkRevokeColumnLevel
+            // 
+            chkRevokeColumnLevel.Location = new Point(514, 127);
+            chkRevokeColumnLevel.Margin = new Padding(3, 4, 3, 4);
+            chkRevokeColumnLevel.Name = "chkRevokeColumnLevel";
+            chkRevokeColumnLevel.Size = new Size(251, 32);
+            chkRevokeColumnLevel.TabIndex = 6;
+            chkRevokeColumnLevel.Text = "Phân quyền cấp cột (chọn cột bên trên)";
+            chkRevokeColumnLevel.UseVisualStyleBackColor = true;
+            chkRevokeColumnLevel.CheckedChanged += chkRevokeColumnLevel_CheckedChanged;
             // 
             // btnRevokeExecute
             // 
             btnRevokeExecute.BackColor = Color.LightCoral;
-            btnRevokeExecute.Location = new Point(450, 110);
+            btnRevokeExecute.Location = new Point(514, 147);
+            btnRevokeExecute.Margin = new Padding(3, 4, 3, 4);
             btnRevokeExecute.Name = "btnRevokeExecute";
-            btnRevokeExecute.Size = new Size(180, 30);
+            btnRevokeExecute.Size = new Size(206, 40);
             btnRevokeExecute.TabIndex = 5;
             btnRevokeExecute.Text = "Thực thi REVOKE";
             btnRevokeExecute.UseVisualStyleBackColor = false;
-            btnRevokeExecute.Click += new System.EventHandler(this.btnRevokeExecute_Click);
+            btnRevokeExecute.Click += btnRevokeExecute_Click;
             // 
             // tabPrivInfo
             // 
@@ -551,10 +614,11 @@
             tabPrivInfo.Controls.Add(txtSearchPrivUser);
             tabPrivInfo.Controls.Add(btnLoadPrivInfo);
             tabPrivInfo.Controls.Add(dgvPrivInfo);
-            tabPrivInfo.Location = new Point(4, 24);
+            tabPrivInfo.Location = new Point(4, 29);
+            tabPrivInfo.Margin = new Padding(3, 4, 3, 4);
             tabPrivInfo.Name = "tabPrivInfo";
-            tabPrivInfo.Padding = new Padding(10);
-            tabPrivInfo.Size = new Size(1092, 672);
+            tabPrivInfo.Padding = new Padding(11, 13, 11, 13);
+            tabPrivInfo.Size = new Size(1249, 900);
             tabPrivInfo.TabIndex = 4;
             tabPrivInfo.Text = "Thông tin quyền";
             tabPrivInfo.UseVisualStyleBackColor = true;
@@ -563,64 +627,55 @@
             // 
             cbPrivilegeType.DropDownStyle = ComboBoxStyle.DropDownList;
             cbPrivilegeType.FormattingEnabled = true;
-            cbPrivilegeType.Items.AddRange(new object[] {
-            "Xem quyền trên bảng",
-            "Xem quyền trên cột",
-            "Xem quyền trên view",
-            "Xem quyền trên procedure/function"});
-            cbPrivilegeType.Location = new Point(10, 20);
+            cbPrivilegeType.Items.AddRange(new object[] { "Xem quyền trên bảng", "Xem quyền trên cột", "Xem quyền trên view", "Xem quyền trên procedure/function" });
+            cbPrivilegeType.Location = new Point(11, 27);
+            cbPrivilegeType.Margin = new Padding(3, 4, 3, 4);
             cbPrivilegeType.Name = "cbPrivilegeType";
-            cbPrivilegeType.Size = new Size(200, 23);
+            cbPrivilegeType.Size = new Size(228, 28);
             cbPrivilegeType.TabIndex = 0;
             // 
             // txtSearchPrivUser
             // 
-            txtSearchPrivUser.Location = new Point(220, 20);
+            txtSearchPrivUser.Location = new Point(251, 27);
+            txtSearchPrivUser.Margin = new Padding(3, 4, 3, 4);
             txtSearchPrivUser.Name = "txtSearchPrivUser";
             txtSearchPrivUser.PlaceholderText = "Mã user / Role (tuỳ chọn)";
-            txtSearchPrivUser.Size = new Size(200, 23);
+            txtSearchPrivUser.Size = new Size(228, 27);
             txtSearchPrivUser.TabIndex = 2;
             // 
             // btnLoadPrivInfo
             // 
             btnLoadPrivInfo.BackColor = Color.LightSkyBlue;
-            btnLoadPrivInfo.Location = new Point(430, 18);
+            btnLoadPrivInfo.Location = new Point(491, 24);
+            btnLoadPrivInfo.Margin = new Padding(3, 4, 3, 4);
             btnLoadPrivInfo.Name = "btnLoadPrivInfo";
-            btnLoadPrivInfo.Size = new Size(140, 27);
+            btnLoadPrivInfo.Size = new Size(160, 36);
             btnLoadPrivInfo.TabIndex = 1;
             btnLoadPrivInfo.Text = "Xem quyền";
             btnLoadPrivInfo.UseVisualStyleBackColor = false;
-            btnLoadPrivInfo.Click += new System.EventHandler(this.btnLoadPrivInfo_Click);
+            btnLoadPrivInfo.Click += btnLoadPrivInfo_Click;
             // 
             // dgvPrivInfo
             // 
             dgvPrivInfo.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             dgvPrivInfo.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            dgvPrivInfo.Location = new Point(10, 70);
+            dgvPrivInfo.ColumnHeadersHeight = 29;
+            dgvPrivInfo.Location = new Point(11, 93);
+            dgvPrivInfo.Margin = new Padding(3, 4, 3, 4);
             dgvPrivInfo.Name = "dgvPrivInfo";
             dgvPrivInfo.ReadOnly = true;
-            dgvPrivInfo.Size = new Size(1072, 592);
+            dgvPrivInfo.RowHeadersWidth = 51;
+            dgvPrivInfo.Size = new Size(1225, 789);
             dgvPrivInfo.TabIndex = 2;
-            // 
-            // btnSearch
-            // 
-            btnSearch.BackColor = Color.LightGreen;
-            btnSearch.Location = new Point(360, 18);
-            btnSearch.Name = "btnSearch";
-            btnSearch.Size = new Size(90, 27);
-            btnSearch.TabIndex = 3;
-            btnSearch.Text = "Tìm kiếm";
-            btnSearch.UseVisualStyleBackColor = false;
-            btnSearch.Click += new System.EventHandler(this.btnSearch_Click);
             // 
             // Form1
             // 
-            AutoScaleDimensions = new SizeF(7F, 15F);
+            AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(1100, 700);
+            ClientSize = new Size(1257, 933);
             Controls.Add(tabMain);
+            Margin = new Padding(3, 4, 3, 4);
             Name = "Form1";
-            Text = "ADMIN - Quản lý bệnh viện";
             tabMain.ResumeLayout(false);
             tabUsers.ResumeLayout(false);
             tabUsers.PerformLayout();
@@ -629,8 +684,11 @@
             tabRoles.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)dgvRoles).EndInit();
             tabGrant.ResumeLayout(false);
+            tabGrant.PerformLayout();
             tabRevoke.ResumeLayout(false);
+            tabRevoke.PerformLayout();
             tabPrivInfo.ResumeLayout(false);
+            tabPrivInfo.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)dgvPrivInfo).EndInit();
             ResumeLayout(false);
         }

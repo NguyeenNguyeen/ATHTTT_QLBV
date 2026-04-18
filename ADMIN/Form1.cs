@@ -376,6 +376,47 @@ namespace ADMIN
             }
         }
 
+        private void clbGrantPrivileges_ItemCheck(object sender, ItemCheckEventArgs e)
+        {
+            // Kiểm tra xem có SELECT hoặc UPDATE được chọn không
+            bool hasSelectOrUpdate = false;
+            
+            for (int i = 0; i < clbGrantPrivileges.Items.Count; i++)
+            {
+                if (i == e.Index)
+                {
+                    // Item hiện tại sẽ được check/uncheck
+                    if (e.NewValue == CheckState.Checked)
+                    {
+                        string itemText = clbGrantPrivileges.Items[i].ToString();
+                        if (itemText == "SELECT" || itemText == "UPDATE")
+                            hasSelectOrUpdate = true;
+                    }
+                }
+                else
+                {
+                    // Kiểm tra item khác
+                    if (clbGrantPrivileges.GetItemChecked(i))
+                    {
+                        string itemText = clbGrantPrivileges.Items[i].ToString();
+                        if (itemText == "SELECT" || itemText == "UPDATE")
+                            hasSelectOrUpdate = true;
+                    }
+                }
+            }
+
+            // Enable/Disable checkbox "Phân quyền cấp cột"
+            chkGrantColumnLevel.Enabled = hasSelectOrUpdate;
+            
+            // Nếu không có SELECT/UPDATE, tự động uncheck và ẩn column list
+            if (!hasSelectOrUpdate)
+            {
+                chkGrantColumnLevel.Checked = false;
+                clbGrantColumns.Visible = false;
+                clbGrantColumns.Items.Clear();
+            }
+        }
+
         private void cbRevokeObjectType_SelectedIndexChanged(object sender, EventArgs e)
         {
             string selectedType = cbRevokeObjectType.SelectedItem?.ToString() ?? "";
@@ -425,6 +466,47 @@ namespace ADMIN
             }
         }
 
+        private void clbRevokePrivileges_ItemCheck(object sender, ItemCheckEventArgs e)
+        {
+            // Kiểm tra xem có SELECT hoặc UPDATE được chọn không
+            bool hasSelectOrUpdate = false;
+            
+            for (int i = 0; i < clbRevokePrivileges.Items.Count; i++)
+            {
+                if (i == e.Index)
+                {
+                    // Item hiện tại sẽ được check/uncheck
+                    if (e.NewValue == CheckState.Checked)
+                    {
+                        string itemText = clbRevokePrivileges.Items[i].ToString();
+                        if (itemText == "SELECT" || itemText == "UPDATE")
+                            hasSelectOrUpdate = true;
+                    }
+                }
+                else
+                {
+                    // Kiểm tra item khác
+                    if (clbRevokePrivileges.GetItemChecked(i))
+                    {
+                        string itemText = clbRevokePrivileges.Items[i].ToString();
+                        if (itemText == "SELECT" || itemText == "UPDATE")
+                            hasSelectOrUpdate = true;
+                    }
+                }
+            }
+
+            // Enable/Disable checkbox "Phân quyền cấp cột"
+            chkRevokeColumnLevel.Enabled = hasSelectOrUpdate;
+            
+            // Nếu không có SELECT/UPDATE, tự động uncheck và ẩn column list
+            if (!hasSelectOrUpdate)
+            {
+                chkRevokeColumnLevel.Checked = false;
+                clbRevokeColumns.Visible = false;
+                clbRevokeColumns.Items.Clear();
+            }
+        }
+
         private void btnGrantExecute_Click(object sender, EventArgs e)
         {
             string grantee = cbGrantGrantee.SelectedItem?.ToString() ?? "";
@@ -455,22 +537,18 @@ namespace ADMIN
                 int successCount = 0;
                 foreach (string privilege in clbGrantPrivileges.CheckedItems)
                 {
+                    string columns = "";
+                    
                     // Nếu cấp quyền cấp cột (chỉ cho SELECT/UPDATE)
                     if (chkGrantColumnLevel.Checked && (privilege == "SELECT" || privilege == "UPDATE"))
                     {
-                        // Gọi SP_GRANT_QUYEN_COT cho từng cột
-                        foreach (string column in clbGrantColumns.CheckedItems)
-                        {
-                            _permManager.GrantColumnPrivilege(objName, column, grantee, privilege);
-                            successCount++;
-                        }
+                        // Tạo danh sách cột cách nhau bằng dấu phẩy
+                        columns = string.Join(",", clbGrantColumns.CheckedItems.Cast<string>());
                     }
-                    else
-                    {
-                        // Cấp quyền table-level (hoặc INSERT/DELETE/EXECUTE)
-                        _permManager.GrantPrivilege(grantee, privilege, objName, "", chkGrantWithOption.Checked);
-                        successCount++;
-                    }
+                    
+                    // Gọi SP_GRANT_ANY_OBJECT - xử lý mọi loại object
+                    _permManager.GrantPrivilege(grantee, privilege, objName, columns, chkGrantWithOption.Checked);
+                    successCount++;
                 }
                 MessageBox.Show($"Cấp quyền thành công cho {grantee}! ({successCount} quyền)", "Thông báo");
             }
@@ -533,10 +611,12 @@ namespace ADMIN
             // Ẩn checkbox phân quyền cấp cột ban đầu
             chkGrantColumnLevel.Visible = false;
             chkGrantColumnLevel.Checked = false;
+            chkGrantColumnLevel.Enabled = false; // Disable cho đến khi SELECT/UPDATE được chọn
             clbGrantColumns.Visible = false;
             
             chkRevokeColumnLevel.Visible = false;
             chkRevokeColumnLevel.Checked = false;
+            chkRevokeColumnLevel.Enabled = false; // Disable cho đến khi SELECT/UPDATE được chọn
             clbRevokeColumns.Visible = false;
         }
     }

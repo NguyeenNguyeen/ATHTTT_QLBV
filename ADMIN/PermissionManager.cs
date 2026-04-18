@@ -9,6 +9,7 @@ namespace ADMIN
 
         /// <summary>
         /// Cấp quyền với support column-level, WITH GRANT OPTION
+        /// Procedure SP_GRANT_ANY_OBJECT xử lý mọi loại object (TABLE, VIEW, PROCEDURE, FUNCTION)
         /// </summary>
         public void GrantPrivilege(string grantee, string privilege, string objectName, 
             string columns = "", bool withGrantOption = false)
@@ -16,13 +17,14 @@ namespace ADMIN
             using (OracleConnection conn = new OracleConnection(_connStr))
             {
                 conn.Open();
-                using (OracleCommand cmd = new OracleCommand("ADMIN_PHANHE1.SP_GRANT_PRIVILEGE", conn))
+                using (OracleCommand cmd = new OracleCommand("ADMIN_PHANHE1.SP_GRANT_ANY_OBJECT", conn))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.Add("p_GRANTEE", OracleDbType.Varchar2).Value = grantee;
                     cmd.Parameters.Add("p_PRIVILEGE", OracleDbType.Varchar2).Value = privilege;
                     cmd.Parameters.Add("p_OBJECT_NAME", OracleDbType.Varchar2).Value = objectName;
-                    cmd.Parameters.Add("p_COLUMNS", OracleDbType.Varchar2).Value = columns ?? "";
+                    // Truyền NULL nếu columns rỗng (table-level), hoặc giá trị cột nếu cần column-level
+                    cmd.Parameters.Add("p_COLUMNS", OracleDbType.Varchar2).Value = string.IsNullOrEmpty(columns) ? null : (object)columns;
                     cmd.Parameters.Add("p_GRANT_OPTION", OracleDbType.Int32).Value = withGrantOption ? 1 : 0;
                     cmd.ExecuteNonQuery();
                 }
@@ -30,25 +32,9 @@ namespace ADMIN
         }
 
         /// <summary>
-        /// Cấp quyền cấp cột (Column-level privilege)
-        /// Dùng cho SELECT/UPDATE trên cột cụ thể
+        /// Cấp quyền cấp cột (Column-level privilege) - DEPRECATED
+        /// Sử dụng GrantPrivilege() với tham số columns thay thế
         /// </summary>
-        public void GrantColumnPrivilege(string tableName, string columnName, string accountName, string privilege)
-        {
-            using (OracleConnection conn = new OracleConnection(_connStr))
-            {
-                conn.Open();
-                using (OracleCommand cmd = new OracleCommand("ADMIN_PHANHE1.SP_GRANT_QUYEN_COT", conn))
-                {
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.Add("p_TEN_BANG", OracleDbType.Varchar2).Value = tableName;
-                    cmd.Parameters.Add("p_TEN_COT", OracleDbType.Varchar2).Value = columnName;
-                    cmd.Parameters.Add("p_TEN_TAIKHOAN", OracleDbType.Varchar2).Value = accountName;
-                    cmd.Parameters.Add("p_QUYEN", OracleDbType.Varchar2).Value = privilege;
-                    cmd.ExecuteNonQuery();
-                }
-            }
-        }
 
         /// <summary>
         /// Thu hồi quyền từ user/role

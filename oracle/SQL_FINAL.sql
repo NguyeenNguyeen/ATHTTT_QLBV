@@ -687,17 +687,17 @@ AND OBJECT_TYPE IN ('PROCEDURE', 'FUNCTION')
 ORDER BY OBJECT_NAME;
 
 -- =================================================================================
--- [NHI?M V? 3]:  PROCEDURE
+-- [NHIỆM VỤ 3]:  PROCEDURE
 -- =================================================================================
 
--- >>> 3.1 PROCEDURE C?P QUY?N TR�N ??I T??NG (TABLE, VIEW, PROC, FUNC)
--- H? tr?: Ph�n quy?n m?c c?t cho SELECT/UPDATE, WITH GRANT OPTION cho User.
-CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_GRANT_PRIVILEGE (
+-- >>> 3.1 PROCEDURE CẤP QUYỀN TRÊN ĐỐI TƯỢNG (TABLE, VIEW, PROC, FUNC)
+-- Hỗ trợ: Phân quyền mức cột cho SELECT/UPDATE, WITH GRANT OPTION cho User.
+CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_GRANT_ANY_OBJECT (
     p_GRANTEE       IN VARCHAR2,
     p_PRIVILEGE     IN VARCHAR2,
     p_OBJECT_NAME   IN VARCHAR2,
-    p_COLUMNS       IN VARCHAR2,
-    p_GRANT_OPTION  IN NUMBER   -- 1: c�, 0: kh�ng
+    p_COLUMNS       IN VARCHAR2, -- Để NULL nếu không phải Table/View
+    p_GRANT_OPTION  IN NUMBER   
 )
 AUTHID CURRENT_USER
 AS
@@ -705,46 +705,43 @@ AS
     v_grant_option_str  VARCHAR2(50) := '';
     v_column_str        VARCHAR2(500) := '';
     v_is_role           NUMBER;
-
-    v_grantee   VARCHAR2(100) := UPPER(TRIM(p_GRANTEE));
-    v_privilege VARCHAR2(50)  := UPPER(TRIM(p_PRIVILEGE));
-    v_obj       VARCHAR2(100) := UPPER(TRIM(p_OBJECT_NAME));
+    v_grantee           VARCHAR2(100) := UPPER(TRIM(p_GRANTEE));
+    v_privilege         VARCHAR2(50)  := UPPER(TRIM(p_PRIVILEGE));
+    v_obj               VARCHAR2(100) := UPPER(TRIM(p_OBJECT_NAME));
 BEGIN
-    -- Validate privilege
-    IF v_privilege NOT IN ('SELECT','INSERT','UPDATE','DELETE','EXECUTE') THEN
-        RAISE_APPLICATION_ERROR(-20001, 'INVALID PRIVILEGE');
-    END IF;
+    -- 1. Check Role/User
+    SELECT COUNT(*) INTO v_is_role FROM DBA_ROLES WHERE ROLE = v_grantee;
 
-    -- Check ROLE hay USER
-    SELECT COUNT(*) INTO v_is_role 
-    FROM DBA_ROLES 
-    WHERE ROLE = v_grantee;
-
-    -- WITH GRANT OPTION ch? �p d?ng cho USER
+    -- 2. Grant Option logic
     IF p_GRANT_OPTION = 1 AND v_is_role = 0 THEN
         v_grant_option_str := ' WITH GRANT OPTION';
     END IF;
 
-    -- Column-level ch? cho SELECT / UPDATE
-    IF (v_privilege = 'SELECT' OR v_privilege = 'UPDATE') THEN
-        IF p_COLUMNS IS NOT NULL AND TRIM(p_COLUMNS) <> '' THEN
-            v_column_str := '(' || UPPER(TRIM(p_COLUMNS)) || ')';
-        END IF;
+    -- 3. Column logic (Chỉ áp dụng cho SELECT/UPDATE trên Table/View)
+    IF (v_privilege IN ('SELECT', 'UPDATE')) AND p_COLUMNS IS NOT NULL THEN
+        v_column_str := ' (' || UPPER(TRIM(p_COLUMNS)) || ')';
     END IF;
 
-    -- Ch?ng injection c? b?n
+    -- 4. Chống Injection
     v_grantee := DBMS_ASSERT.SIMPLE_SQL_NAME(v_grantee);
     v_obj     := DBMS_ASSERT.SIMPLE_SQL_NAME(v_obj);
 
-    -- Build SQL
-    v_sql := 'GRANT ' || v_privilege || v_column_str ||
-             ' ON ADMIN_PHANHE1.' || v_obj ||
+    -- 5. Thực thi
+    v_sql := 'GRANT ' || v_privilege || v_column_str || 
+             ' ON ADMIN_PHANHE1.' || v_obj || 
              ' TO ' || v_grantee || v_grant_option_str;
 
+    DBMS_OUTPUT.PUT_LINE('Executing: ' || v_sql);
     EXECUTE IMMEDIATE v_sql;
+    COMMIT;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('ERROR: ' || SQLERRM);
+        RAISE;
 END;
 /
--- Procedure cấp quyền cấp cột (Column-level privilege)
+-- Procedure cấp quyền cấp cột (Column-level privilege) - DEPRECATED, sử dụng SP_GRANT_ANY_OBJECT thay thế
 CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_GRANT_QUYEN_COT (
     p_TEN_BANG IN VARCHAR2,       -- Tên bảng (VD: NHANVIEN)
     p_TEN_COT IN VARCHAR2,        -- Tên cột (VD: SODT)
