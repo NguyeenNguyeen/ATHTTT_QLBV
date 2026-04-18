@@ -1,0 +1,152 @@
+-- ==========================================
+-- 1. TẠO CÁC BẢNG ĐỘC LẬP (Không có khóa ngoại)
+-- ==========================================
+
+-- Bảng KHOA
+CREATE TABLE KHOA (
+    MAKHOA VARCHAR2(20) PRIMARY KEY,
+    TENKHOA NVARCHAR2(100)
+);
+
+-- Bảng NHÂN VIÊN
+CREATE TABLE NHANVIEN (
+    MANV VARCHAR2(20) PRIMARY KEY,
+    HOTEN NVARCHAR2(100),
+    PHAI NVARCHAR2(10),
+    NGAYSINH DATE,
+    CMND VARCHAR2(20),
+    QUEQUAN NVARCHAR2(200),
+    SODT VARCHAR2(15),
+    VAITRO NVARCHAR2(50),
+    CHUYENKHOA NVARCHAR2(100),
+    COSO NVARCHAR2(50) -- Bổ sung cho OLS (HCM, HN, HP)
+);
+
+-- Bảng BỆNH NHÂN
+CREATE TABLE BENHNHAN (
+    MABN VARCHAR2(20) PRIMARY KEY,
+    TENBN NVARCHAR2(100),
+    PHAI NVARCHAR2(10),
+    NGAYSINH DATE,
+    CCCD VARCHAR2(20),
+    SONHA NVARCHAR2(50),
+    TENDUONG NVARCHAR2(100),
+    QUANHUYEN NVARCHAR2(50),
+    TINHTP NVARCHAR2(50),
+    TIENSUBENH NVARCHAR2(1000),
+    TIENSUBENHGD NVARCHAR2(1000),
+    DIUNGTHUOC NVARCHAR2(1000)
+);
+
+-- Bảng THÔNG BÁO (Độc lập, dùng cho OLS)
+CREATE TABLE THONG_BAO (
+    MATB VARCHAR2(20) PRIMARY KEY,
+    NOIDUNG NVARCHAR2(1000),
+    NGAYGIO TIMESTAMP,
+    DIADIEM NVARCHAR2(100),
+    OLS_LABEL NUMBER(10) -- Cột lưu mã số của nhãn OLS
+);
+
+
+-- ==========================================
+-- 2. TẠO CÁC BẢNG PHỤ THUỘC (Có khóa ngoại)
+-- ==========================================
+
+-- Bảng HỒ SƠ BỆNH ÁN (HSBA)
+CREATE TABLE HSBA (
+    MAHSBA VARCHAR2(20) PRIMARY KEY,
+    MABN VARCHAR2(20),
+    NGAY DATE,
+    CHANDOAN NVARCHAR2(500),
+    DIEUTRI NVARCHAR2(500),
+    MABS VARCHAR2(20),
+    MAKHOA VARCHAR2(20),
+    KETLUAN NVARCHAR2(500),
+    
+    -- Ràng buộc khóa ngoại
+    CONSTRAINT FK_HSBA_BENHNHAN FOREIGN KEY (MABN) REFERENCES BENHNHAN(MABN),
+    CONSTRAINT FK_HSBA_NHANVIEN FOREIGN KEY (MABS) REFERENCES NHANVIEN(MANV),
+    CONSTRAINT FK_HSBA_KHOA FOREIGN KEY (MAKHOA) REFERENCES KHOA(MAKHOA)
+);
+
+-- Bảng DỊCH VỤ HỒ SƠ BỆNH ÁN (HSBA_DV)
+CREATE TABLE HSBA_DV (
+    MAHSBA VARCHAR2(20),
+    LOAIDV NVARCHAR2(100),
+    NGAYDV DATE,
+    MAKTV VARCHAR2(20),
+    KETQUA NVARCHAR2(500),
+    
+    -- Khóa chính kết hợp
+    PRIMARY KEY (MAHSBA, LOAIDV, NGAYDV),
+    
+    -- Ràng buộc khóa ngoại
+    CONSTRAINT FK_HSBADV_HSBA FOREIGN KEY (MAHSBA) REFERENCES HSBA(MAHSBA),
+    CONSTRAINT FK_HSBADV_NHANVIEN FOREIGN KEY (MAKTV) REFERENCES NHANVIEN(MANV)
+);
+
+-- Bảng ĐƠN THUỐC
+CREATE TABLE DONTHUOC (
+    MAHSBA VARCHAR2(20),
+    TENTHUOC NVARCHAR2(100),
+    NGAYDT DATE,
+    LIEUDUNG NVARCHAR2(200),
+    
+    -- Khóa chính kết hợp
+    PRIMARY KEY (MAHSBA, TENTHUOC, NGAYDT),
+    
+    -- Ràng buộc khóa ngoại
+    CONSTRAINT FK_DONTHUOC_HSBA FOREIGN KEY (MAHSBA) REFERENCES HSBA(MAHSBA)
+);
+
+-- Cập nhật thông tin Nhân viên
+-- Lệnh xóa (Nếu chưa có sẽ báo lỗi ORA-04043, bạn cứ bỏ qua không sao nhé)
+DROP PROCEDURE ADMIN_PHANHE1.SP_SUA_NHANVIEN;
+
+-- Lệnh tạo mới
+CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_SUA_NHANVIEN (
+    p_MANV IN VARCHAR2, -- Mã NV dùng để xác định người cần sửa
+    p_HOTEN IN NVARCHAR2,
+    p_PHAI IN NVARCHAR2,
+    p_NGAYSINH IN DATE,
+    p_CMND IN VARCHAR2,
+    p_QUEQUAN IN NVARCHAR2,
+    p_SODT IN VARCHAR2,
+    p_VAITRO IN NVARCHAR2,
+    p_CHUYENKHOA IN NVARCHAR2,
+    p_COSO IN NVARCHAR2,
+    p_MATKHAU IN VARCHAR2 -- Nhận mật khẩu mới (có thể rỗng)
+)
+AUTHID CURRENT_USER
+IS
+    v_sql VARCHAR2(500);
+BEGIN
+    -- Bước 1: Cập nhật thông tin cá nhân trong bảng NHANVIEN
+    UPDATE ADMIN_PHANHE1.NHANVIEN 
+    SET HOTEN = p_HOTEN,
+        PHAI = p_PHAI,
+        NGAYSINH = p_NGAYSINH,
+        CMND = p_CMND,
+        QUEQUAN = p_QUEQUAN,
+        SODT = p_SODT,
+        VAITRO = p_VAITRO,
+        CHUYENKHOA = p_CHUYENKHOA,
+        COSO = p_COSO
+    WHERE MANV = p_MANV;
+
+    -- Bước 2: Đổi mật khẩu tài khoản Oracle (Nếu người dùng có nhập mật khẩu trên Form)
+    IF p_MATKHAU IS NOT NULL AND TRIM(p_MATKHAU) <> '' THEN
+        v_sql := 'ALTER USER C##' || p_MANV || ' IDENTIFIED BY ""' || p_MATKHAU || '""';
+        EXECUTE IMMEDIATE v_sql;
+    END IF;
+
+    -- Hoàn tất và lưu dữ liệu
+    COMMIT;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        -- Hoàn tác nếu có bất kỳ lỗi gì xảy ra (ví dụ: vi phạm ràng buộc dữ liệu)
+        ROLLBACK;
+        RAISE;
+END;
+/
