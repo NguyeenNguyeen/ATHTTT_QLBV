@@ -6,8 +6,57 @@ namespace ADMIN
 {
     public partial class Form1 : Form
     {
-        private const string ConnectionString = "User Id=SYSTEM;Password=oracle;Data Source=localhost:1521/orcl21";
+        private const string ConnectionString = "User Id=SYSTEM;Password=oracle;Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))(CONNECT_DATA=(SID=xe)));";
         private static readonly Regex OracleIdentifierRegex = new("^[A-Za-z][A-Za-z0-9_$#]*$", RegexOptions.Compiled);
+
+        // Method ghi log lỗi vào file txt
+        private void LogError(string errorMessage)
+        {
+            try
+            {
+                string logPath = Path.Combine(Application.StartupPath, "error_log.txt");
+                string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                string logContent = $"[{timestamp}] {errorMessage}\n{new string('=', 80)}\n";
+                
+                File.AppendAllText(logPath, logContent);
+                MessageBox.Show($"Lỗi đã được ghi vào: {logPath}", "Log");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi ghi log: {ex.Message}", "Lỗi Ghi Log");
+            }
+        }
+
+        public Form1()
+        {
+            InitializeComponent();
+            TestConnection();
+        }
+
+        // Method test connection khi form khởi tạo
+        private void TestConnection()
+        {
+            try
+            {
+                using (OracleConnection conn = new OracleConnection(ConnectionString))
+                {
+                    conn.Open();
+                    conn.Close();
+                    MessageBox.Show("✓ Kết nối Oracle thành công!", "Thành Công");
+                }
+            }
+            catch (Exception ex)
+            {
+                string errorDetail = $"CONNECTION TEST ERROR:\n\n" +
+                    $"Connection String: {ConnectionString}\n\n" +
+                    $"Error Type: {ex.GetType().Name}\n" +
+                    $"Error Message: {ex.Message}\n\n" +
+                    $"Stack Trace:\n{ex.StackTrace}";
+                
+                LogError(errorDetail);
+                MessageBox.Show($"✗ Lỗi kết nối:\n{ex.Message}", "Lỗi Kết Nối");
+            }
+        }
 
         private void btnAddUser_Click(object sender, EventArgs e)
         {
@@ -271,6 +320,164 @@ namespace ADMIN
             {
                 MessageBox.Show($"Lỗi Hệ Thống: {ex.Message}", "Lỗi Hệ Thống", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        /// <summary>
+        /// Sự kiện cấp quyền (Nhiệm vụ 3)
+        /// Gọi procedure ADMIN_PHANHE1.SP_GRANT_PRIVILEGE để cấp quyền cho User/Role
+        /// </summary>
+        private void btnGrantExecute_Click(object sender, EventArgs e)
+        {
+            // Kiểm tra input
+            string grantee = cbGrantGrantee.SelectedItem?.ToString()?.Trim() ?? "";
+            string privilege = GetSelectedPrivileges(); // Hàm lấy quyền từ CheckedListBox
+            string objectName = cbGrantObjectName.SelectedItem?.ToString()?.Trim() ?? "";
+
+            if (string.IsNullOrEmpty(grantee))
+            {
+                MessageBox.Show("Vui lòng chọn User/Role cần cấp quyền.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (string.IsNullOrEmpty(privilege))
+            {
+                MessageBox.Show("Vui lòng chọn loại quyền (SELECT, INSERT, UPDATE, DELETE, EXECUTE).", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (string.IsNullOrEmpty(objectName))
+            {
+                MessageBox.Show("Vui lòng chọn đối tượng cơ sở dữ liệu (Bảng/Procedure/...).", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Lấy danh sách cột được tick (nếu có)
+            string columns = null;
+            if ((privilege == "SELECT" || privilege == "UPDATE") && clbGrantColumns.Items.Count > 0)
+            {
+                var selectedColumns = new List<string>();
+                foreach (int index in clbGrantColumns.CheckedIndices)
+                {
+                    selectedColumns.Add(clbGrantColumns.Items[index]?.ToString() ?? "");
+                }
+
+                if (selectedColumns.Count > 0)
+                {
+                    columns = string.Join(", ", selectedColumns);
+                }
+            }
+
+            // Xử lý GRANT OPTION
+            bool grantOption = chkGrantWithOption.Checked;
+            
+            // Nếu cbGrantGrantee là một Role, ép grantOption về false (Oracle limitation)
+            if (grantee.ToUpper().Contains("ROLE"))
+            {
+                grantOption = false;
+            }
+
+            // Kết nối Oracle
+            string connectionString = @"User Id=ADMIN_PHANHE1;Password=Admin@123456;Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=127.0.0.1)(PORT=1521))(CONNECT_DATA=(SERVER=DEDICATED)(SERVICE_NAME=orcl21)));";
+
+            try
+            {
+                using (OracleConnection conn = new OracleConnection(connectionString))
+                {
+                    conn.Open();
+                    using (OracleCommand cmd = new OracleCommand())
+                    {
+                        cmd.Connection = conn;
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.CommandText = "ADMIN_PHANHE1.SP_GRANT_PRIVILEGE";
+
+                        // Thêm các tham số
+                        cmd.Parameters.Add("p_GRANTEE", OracleDbType.Varchar2).Value = grantee;
+                        cmd.Parameters.Add("p_PRIVILEGE", OracleDbType.Varchar2).Value = privilege;
+                        cmd.Parameters.Add("p_OBJECT_NAME", OracleDbType.Varchar2).Value = objectName;
+                        
+                        // Nếu không có cột hoặc quyền không phải SELECT/UPDATE, truyền null
+                        if (!string.IsNullOrEmpty(columns))
+                        {
+                            cmd.Parameters.Add("p_COLUMNS", OracleDbType.Varchar2).Value = columns;
+                        }
+                        else
+                        {
+                            cmd.Parameters.Add("p_COLUMNS", OracleDbType.Varchar2).Value = DBNull.Value;
+                        }
+
+                        cmd.Parameters.Add("p_GRANT_OPTION", OracleDbType.Int32).Value = grantOption ? 1 : 0;
+
+                        // Thực thi procedure
+                        cmd.ExecuteNonQuery();
+
+                        // Thành công
+                        MessageBox.Show(
+                            $"✓ Cấp quyền thành công!\n\n" +
+                            $"User/Role: {grantee}\n" +
+                            $"Quyền: {privilege}\n" +
+                            $"Đối tượng: {objectName}" +
+                            (columns != null ? $"\nCột: {columns}" : "") +
+                            $"\nWith Grant Option: {(grantOption ? "Có" : "Không")}",
+                            "Cấp Quyền Thành Công",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information
+                        );
+
+                        // Reload tab thông tin quyền
+                        if (tabMain != null && tabMain.TabPages.Count > 4)
+                        {
+                            btnLoadPrivInfo_Click(sender, e);
+                        }
+
+                        // Xóa input sau khi thành công
+                        cbGrantGrantee.SelectedIndex = -1;
+                        cbGrantObjectType.SelectedIndex = -1;
+                        cbGrantObjectName.SelectedIndex = -1;
+                        chkGrantWithOption.Checked = false;
+                        clbGrantPrivileges.ClearSelected();
+                        clbGrantColumns.ClearSelected();
+                    }
+                }
+            }
+            catch (OracleException oex)
+            {
+                string errorMsg = $"Lỗi Oracle ({oex.Number}):\n{oex.Message}";
+                
+                // Log lỗi ra file
+                try
+                {
+                    string logFile = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "Oracle_Error_Log.txt");
+                    string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                    string logContent = $"[{timestamp}] GRANT PRIVILEGE ERROR\n" +
+                        $"User/Role: {grantee}\n" +
+                        $"Quyền: {privilege}\n" +
+                        $"Đối tượng: {objectName}\n" +
+                        $"Lỗi: {errorMsg}\n" +
+                        $"{new string('=', 80)}\n";
+                    
+                    System.IO.File.AppendAllText(logFile, logContent);
+                }
+                catch { }
+
+                MessageBox.Show(errorMsg, "Lỗi Cơ Sở Dữ Liệu", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi Hệ Thống: {ex.Message}\n\nStack Trace:\n{ex.StackTrace}", "Lỗi Hệ Thống", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// Lấy quyền được chọn từ clbGrantPrivileges (CheckedListBox)
+        /// </summary>
+        private string GetSelectedPrivileges()
+        {
+            var selectedPrivileges = new List<string>();
+            foreach (int index in clbGrantPrivileges.CheckedIndices)
+            {
+                selectedPrivileges.Add(clbGrantPrivileges.Items[index]?.ToString() ?? "");
+            }
+            return selectedPrivileges.Count > 0 ? selectedPrivileges[0] : ""; // Lấy quyền đầu tiên nếu cần
         }
 
         public Form1()

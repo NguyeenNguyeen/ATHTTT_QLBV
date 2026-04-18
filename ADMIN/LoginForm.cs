@@ -25,8 +25,8 @@ namespace ADMIN
             }
 
             // Phân giải chuỗi kết nối dựa trên Tên đăng nhập & mật khẩu cung cấp
-            string connString = $"User Id={username};Password={password};Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=127.0.0.1)(PORT=1521))(CONNECT_DATA=(SERVER=DEDICATED)(SERVICE_NAME=orcl21)));";
-
+            // Phân giải chuỗi kết nối dựa trên Tên đăng nhập & mật khẩu cung cấp
+            string connString = $"User Id={username};Password={password};Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))(CONNECT_DATA=(SID=xe)));";
             try
             {
                 // Thử kết nối với Oracle
