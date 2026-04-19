@@ -1,4 +1,4 @@
-# 🚀 HƯỚNG DẪN COMPILE & CHẠY
+# HƯỚNG DẪN COMPILE & CHẠY
 
 ## Bước 1: Compile Project trên Visual Studio
 
@@ -80,19 +80,19 @@ public static readonly string AdminConnectionString =
 
 ---
 
-## ✅ Checklist Hoàn Thành
+## Checklist Hoàn Thành
 
-- [ ] Project compile thành công (0 lỗi)
-- [ ] Oracle Database hoạt động bình thường
-- [ ] Tất cả Procedure đã được tạo
-- [ ] Application chạy mà không crash
-- [ ] Có thể cấp quyền thành công
-- [ ] Có thể thu hồi quyền thành công
-- [ ] Có thể tạo quyền thành công
-- [ ] Có thể xem thông tin quyền thành công
+-  Project compile thành công (0 lỗi)
+-  Oracle Database hoạt động bình thường
+-  Tất cả Procedure đã được tạo
+-  Application chạy mà không crash
+-  Có thể cấp quyền thành công
+-  Có thể thu hồi quyền thành công
+-  Có thể tạo quyền thành công
+-  Có thể xem thông tin quyền thành công
 ---
 
-## 🆘 Troubleshooting
+## Troubleshooting
 
 ### Vấn đề: "Connection timeout"
 **Giải pháp**:
