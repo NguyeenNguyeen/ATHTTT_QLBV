@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 namespace ADMIN
+=======
+﻿namespace ADMIN
+>>>>>>> 9718279 (Feature Role)
 {
     partial class AddUserForm
     {
@@ -219,7 +223,11 @@ namespace ADMIN
 
             this.btnSave.Location = new System.Drawing.Point(150, finalY);
             this.btnSave.Size = new System.Drawing.Size(100, 30);
+<<<<<<< HEAD
             this.btnSave.Text = "Lưu";
+=======
+            this.btnSave.Text = "Luu";
+>>>>>>> 9718279 (Feature Role)
             this.btnSave.UseVisualStyleBackColor = true;
             this.btnSave.Click += new System.EventHandler(this.btnSave_Click);
 

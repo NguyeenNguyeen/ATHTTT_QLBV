@@ -1,0 +1,88 @@
+CREATE OR REPLACE PROCEDURE SP_XEM_TAT_CA_ROLE (
+p_recordset OUT SYS_REFCURSOR
+)
+IS
+BEGIN
+-- Mở con trỏ lấy dữ liệu, chỉ lấy các role có ORACLE_MAINTAINED = 'N'
+OPEN p_recordset FOR
+SELECT ROLE,
+ROLE_ID,
+PASSWORD_REQUIRED,
+AUTHENTICATION_TYPE
+FROM dba_roles
+WHERE ORACLE_MAINTAINED = 'Y' -- Đây là điều kiện quan trọng để lọc role hệ thống
+ORDER BY ROLE_ID DESC;
+
+EXCEPTION
+WHEN OTHERS THEN
+RAISE_APPLICATION_ERROR(-20002, 'Lỗi khi lấy danh sách Role: ' || SQLERRM);
+END;
+/
+
+
+
+CREATE OR REPLACE PROCEDURE SP_XOA_ROLE (
+    p_ten_role IN VARCHAR2
+) 
+IS
+    v_count NUMBER;
+BEGIN
+    -- 1. Cho phép xóa cả các role được tạo bằng _ORACLE_SCRIPT (nếu cần)
+    EXECUTE IMMEDIATE 'ALTER SESSION SET "_ORACLE_SCRIPT"=true';
+
+    -- 2. Kiểm tra role có tồn tại không trước khi xóa
+    SELECT COUNT(*) INTO v_count 
+    FROM dba_roles 
+    WHERE role = UPPER(p_ten_role);
+
+    IF v_count > 0 THEN
+        -- 3. Thực hiện xóa role
+        EXECUTE IMMEDIATE 'DROP ROLE ' || p_ten_role;
+        DBMS_OUTPUT.PUT_LINE('Đã xóa thành công role: ' || p_ten_role);
+    ELSE
+        -- Nếu không tìm thấy role, ném lỗi về cho C# biết
+        RAISE_APPLICATION_ERROR(-20003, 'Role ' || p_ten_role || ' không tồn tại trong hệ thống.');
+    END IF;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        -- Trả mã lỗi chi tiết về cho ứng dụng thay vì im lặng
+        RAISE_APPLICATION_ERROR(-20004, 'Lỗi thực tế từ Oracle: ' || SQLERRM);
+END;
+/
+
+
+
+CREATE OR REPLACE PROCEDURE SP_TAO_ROLE_VA_CAP_QUYEN (
+    p_ten_role IN VARCHAR2,
+    p_quyen    IN VARCHAR2, -- Ví dụ: 'INSERT', 'SELECT', 'UPDATE'
+    p_ten_bang IN VARCHAR2  -- Ví dụ: 'NHANVIEN'
+) 
+IS
+    v_count NUMBER;
+    v_sql_grant VARCHAR2(500);
+BEGIN
+EXECUTE IMMEDIATE 'ALTER SESSION SET "_ORACLE_SCRIPT"=true';
+    -- 1. Kiểm tra xem role đã tồn tại chưa
+    SELECT COUNT(*) INTO v_count 
+    FROM dba_roles 
+    WHERE role = UPPER(p_ten_role);
+    
+    -- 2. Nếu chưa có -> Tạo role mới
+    IF v_count = 0 THEN
+        EXECUTE IMMEDIATE 'CREATE ROLE ' || p_ten_role;
+    END IF;
+    
+    -- 3. Tạo câu lệnh gán quyền trên BẢNG cụ thể
+    -- Cú pháp chuẩn: GRANT quyền ON bảng TO role
+    v_sql_grant := 'GRANT ' || p_quyen || ' ON ' || p_ten_bang || ' TO ' || p_ten_role;
+    
+    -- 4. Thực thi gán quyền
+    EXECUTE IMMEDIATE v_sql_grant;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        -- Ghi log lỗi vào DBMS_OUTPUT hoặc bạn có thể dùng RAISE_APPLICATION_ERROR để C# bắt lỗi
+        RAISE_APPLICATION_ERROR(-20001, 'Lỗi khi xử lý Role: ' || SQLERRM);
+END;
+/
