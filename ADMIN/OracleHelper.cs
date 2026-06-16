@@ -21,7 +21,7 @@ namespace ADMIN
                         if (param.Value is OracleParameter oraParam)
                             cmd.Parameters.Add(oraParam);
                         else
-                            cmd.Parameters.Add(param.Key, OracleDbType.Varchar2).Value = param.Value ?? "";
+                            cmd.Parameters.Add(param.Key, OracleDbType.Varchar2).Value = param.Value ?? DBNull.Value;
                     }
                     cmd.ExecuteNonQuery();
                 }
@@ -39,7 +39,7 @@ namespace ADMIN
                     if (parameters != null)
                     {
                         foreach (var param in parameters)
-                            cmd.Parameters.Add(param.Key, OracleDbType.Varchar2).Value = param.Value ?? "";
+                            cmd.Parameters.Add(param.Key, OracleDbType.Varchar2).Value = param.Value ?? DBNull.Value;
                     }
                     using (OracleDataAdapter adapter = new OracleDataAdapter(cmd))
                     {
