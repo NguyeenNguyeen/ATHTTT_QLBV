@@ -114,7 +114,7 @@ namespace ADMIN
             Panel panelTop = new Panel { Dock = DockStyle.Top, Height = 50 };
             Label lblTitle = new Label
             {
-                Text = "DANH SÁCH HỒ SƠ BỆNH ÁN ĐANG ĐIỀU TRỊ",
+                Text = "DS HỒ SƠ BỆNH ÁN",
                 Font = new Font("Segoe UI", 12, FontStyle.Bold),
                 ForeColor = Color.FromArgb(26, 188, 156),
                 Location = new Point(5, 12),
@@ -126,7 +126,7 @@ namespace ADMIN
             Button btnUpdate = new Button
             {
                 Text = "Cập Nhật Chẩn Đoán",
-                Location = new Point(400, 10),
+                Location = new Point(480, 10),
                 Width = 160,
                 Height = 30,
                 BackColor = Color.FromArgb(46, 204, 113),
@@ -142,7 +142,7 @@ namespace ADMIN
             Button btnReload = new Button
             {
                 Text = "Làm Mới",
-                Location = new Point(570, 10),
+                Location = new Point(650, 10),
                 Width = 100,
                 Height = 30,
                 BackColor = Color.FromArgb(52, 152, 219),
@@ -223,7 +223,7 @@ namespace ADMIN
             
             Label lblSelect = new Label
             {
-                Text = "Chọn Hồ Sơ Bệnh Án (HSBA):",
+                Text = "Chọn Hồ Sơ Bệnh Án:",
                 Font = new Font("Segoe UI", 9, FontStyle.Bold),
                 Location = new Point(5, 20),
                 AutoSize = true
@@ -438,7 +438,7 @@ namespace ADMIN
 
             Label lblSelect = new Label
             {
-                Text = "Chọn Hồ Sơ Bệnh Án (HSBA):",
+                Text = "Chọn Hồ Sơ Bệnh Án:",
                 Font = new Font("Segoe UI", 9, FontStyle.Bold),
                 Location = new Point(5, 20),
                 AutoSize = true
@@ -657,7 +657,7 @@ namespace ADMIN
             Panel panelTop = new Panel { Dock = DockStyle.Top, Height = 50 };
             Label lblTitle = new Label
             {
-                Text = "BỆNH NHÂN THUỘC PHÂN CÔNG ĐIỀU TRỊ",
+                Text = "BN ĐƯỢC PHÂN CÔNG ĐIỀU TRỊ",
                 Font = new Font("Segoe UI", 12, FontStyle.Bold),
                 ForeColor = Color.FromArgb(26, 188, 156),
                 Location = new Point(5, 12),
@@ -669,7 +669,7 @@ namespace ADMIN
             Button btnEdit = new Button
             {
                 Text = "Cập Nhật Bệnh Án (Tiền Sử/Dị Ứng)",
-                Location = new Point(400, 10),
+                Location = new Point(480, 10),
                 Width = 240,
                 Height = 30,
                 BackColor = Color.FromArgb(241, 196, 15),
@@ -685,7 +685,7 @@ namespace ADMIN
             Button btnReload = new Button
             {
                 Text = "Làm Mới",
-                Location = new Point(650, 10),
+                Location = new Point(730, 10),
                 Width = 100,
                 Height = 30,
                 BackColor = Color.FromArgb(52, 152, 219),

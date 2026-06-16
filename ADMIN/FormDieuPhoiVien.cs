@@ -249,7 +249,7 @@ namespace ADMIN
             Button btnCreate = new Button
             {
                 Text = "Tạo HSBA Mới",
-                Location = new Point(400, 10),
+                Location = new Point(450, 10),
                 Width = 130,
                 Height = 30,
                 BackColor = Color.FromArgb(46, 204, 113),
@@ -265,7 +265,7 @@ namespace ADMIN
             Button btnAssign = new Button
             {
                 Text = "Cập Nhật Phân Công",
-                Location = new Point(540, 10),
+                Location = new Point(590, 10),
                 Width = 160,
                 Height = 30,
                 BackColor = Color.FromArgb(241, 196, 15),
@@ -281,7 +281,7 @@ namespace ADMIN
             Button btnReload = new Button
             {
                 Text = "Làm Mới",
-                Location = new Point(710, 10),
+                Location = new Point(760, 10),
                 Width = 100,
                 Height = 30,
                 BackColor = Color.FromArgb(52, 152, 219),
@@ -383,7 +383,7 @@ namespace ADMIN
             Button btnAssignKTV = new Button
             {
                 Text = "Phân công KTV",
-                Location = new Point(400, 10),
+                Location = new Point(480, 10),
                 Width = 140,
                 Height = 30,
                 BackColor = Color.FromArgb(46, 204, 113),
@@ -399,7 +399,7 @@ namespace ADMIN
             Button btnReload = new Button
             {
                 Text = "Làm Mới",
-                Location = new Point(550, 10),
+                Location = new Point(630, 10),
                 Width = 100,
                 Height = 30,
                 BackColor = Color.FromArgb(52, 152, 219),
