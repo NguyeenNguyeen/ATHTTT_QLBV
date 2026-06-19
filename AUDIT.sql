@@ -1,4 +1,8 @@
 
+
+GRANT SELECT ON SYS.DBA_AUDIT_TRAIL TO ADMIN_PHANHE1;
+GRANT SELECT ON AUDSYS.UNIFIED_AUDIT_TRAIL TO ADMIN_PHANHE1;
+
 -- =====================================================================
 -- STANDARD AUDIT
 -- =====================================================================
@@ -32,7 +36,7 @@ AUDIT INSERT, UPDATE, DELETE ON ADMIN_PHANHE1.HSBA BY ACCESS;
 -- Ghi log mỗi khi có người đọc dữ liệu này.
 -- =====================================================================
 -- Lưu ý: Đổi 'V_HSBA_BACSI' thành tên View thực tế của nhóm.
-AUDIT SELECT ON V_HSBA_BACSI BY ACCESS;
+-- AUDIT SELECT ON V_HSBA_BACSI BY ACCESS;
 
 -- =====================================================================
 -- NGỮ CẢNH 4: Giám sát Thủ tục (Stored Procedure / Function)
@@ -40,7 +44,7 @@ AUDIT SELECT ON V_HSBA_BACSI BY ACCESS;
 -- Ví dụ: Giám sát xem ai đã chạy thủ tục tạo hồ sơ bệnh án mới.
 -- =====================================================================
 -- Lưu ý: Đổi 'SP_TAO_HSBA' thành tên Procedure thực tế của nhóm.
-AUDIT EXECUTE ON SP_TAO_HSBA BY ACCESS;
+-- AUDIT EXECUTE ON SP_TAO_HSBA BY ACCESS;
 
 -- =====================================================================
 -- NGỮ CẢNH 5: Giám sát Cấu trúc (DDL) - Bảo vệ Schema
@@ -48,28 +52,6 @@ AUDIT EXECUTE ON SP_TAO_HSBA BY ACCESS;
 -- =====================================================================
 AUDIT TABLE BY ACCESS;
 
--- view tổng hợp log audit chuẩn hóa để UI dễ đọc hơn
-CREATE OR REPLACE VIEW V_STANDARD_AUDIT_LOG AS
-SELECT 
-    USERNAME AS "NGUOI_DUNG",               -- Ai đã thực hiện?
-    TO_CHAR(EXTENDED_TIMESTAMP, 'DD/MM/YYYY HH24:MI:SS') AS "THOI_GIAN", -- Khi nào?
-    ACTION_NAME AS "HANH_DONG",             -- Làm gì? (SELECT, UPDATE, LOGON...)
-    OWNER AS "CHU_SO_HUU",                  -- Schema nào?
-    OBJ_NAME AS "DOI_TUONG",                -- Tác động lên Bảng/View/SP nào?
-    SQL_TEXT AS "CAU_LENH_SQL",             -- Câu SQL thực tế đã chạy là gì?
-    CASE RETURNCODE 
-        WHEN 0 THEN 'Thành công' 
-        ELSE 'Thất bại (Mã lỗi: ' || RETURNCODE || ')' 
-    END AS "TRANG_THAI"                     -- Thành công hay thất bại?
-FROM 
-    DBA_AUDIT_TRAIL
-WHERE 
-    -- Lọc bỏ các log hệ thống nội bộ của Oracle để UI không bị rác
-    USERNAME NOT IN ('SYS', 'SYSTEM', 'DBSNMP', 'SYSMAN') 
-ORDER BY 
-    EXTENDED_TIMESTAMP DESC;
-
-select * from V_STANDARD_AUDIT_LOG;
 
 
 
@@ -176,7 +158,7 @@ BEGIN
     -- 3d.3. Bắt lỗi UPDATE bất hợp pháp lên cột KETQUA
     -- Logic: Chỉ KTV mới được quyền sửa cột KẾT QUẢ.
     -- Nếu người sửa KHÔNG PHẢI KTV (ví dụ Bác sĩ, ĐPV lén ghi kết quả khống) -> Ghi log!
-    -- =====================================================================
+    -- =====================================================================    
     DBMS_FGA.ADD_POLICY(
         object_schema   => 'ADMIN_PHANHE1',
         object_name     => 'HSBA_DV',
@@ -200,32 +182,72 @@ BEGIN
 END;
 /
 
--- view tổng hợp log audit chuẩn hóa để UI dễ đọc hơn
-CREATE OR REPLACE VIEW V_FGA_LOG AS
+
+-- CHỈ CẦN 1 TRANG ĐỂ SELECT * FROM VIEW ADMIN_PHANHE1.V_ALL_AUDIT_LOG ĐỂ XEM TẤT CẢ CÁC LOGS
+
+CREATE OR REPLACE VIEW ADMIN_PHANHE1.V_ALL_AUDIT_LOG AS
 SELECT 
-    DBUSERNAME AS "NGUOI_DUNG",
-    TO_CHAR(EVENT_TIMESTAMP, 'DD/MM/YYYY HH24:MI:SS') AS "THOI_GIAN",
-    FGA_POLICY_NAME AS "CHINH_SACH_KIEM_TOAN",
-    OBJECT_SCHEMA || '.' || OBJECT_NAME AS "BANG_BI_TAC_DONG",
-    SQL_TEXT AS "CAU_LENH_SQL",
-    CASE 
-        WHEN FGA_POLICY_NAME LIKE '%BATHOPPHAP%' THEN 'Cảnh báo Đỏ: Hành vi bất hợp pháp'
-        WHEN FGA_POLICY_NAME LIKE '%HOPPHAP%' THEN 'Bình thường: Cập nhật đúng thẩm quyền'
-        ELSE 'Theo dõi hệ thống'
-    END AS "PHAN_LOAI_CANH_BAO"
-FROM 
-    UNIFIED_AUDIT_TRAIL
-WHERE 
-    FGA_POLICY_NAME IS NOT NULL 
-    AND DBUSERNAME NOT IN ('SYS', 'SYSTEM')
-    -- Điểm mấu chốt để bắt lỗi câu 3b nằm ở đây:
-    AND (
-        (FGA_POLICY_NAME = 'FGA_HSBA_CAPNHAT_HOPPHAP' AND RETURN_CODE = 0) -- Chỉ lấy dòng thành công
-        OR 
-        (FGA_POLICY_NAME != 'FGA_HSBA_CAPNHAT_HOPPHAP') -- Các policy khác lấy hết (thành công/thất bại)
-    )
-ORDER BY 
-    EVENT_TIMESTAMP DESC;
+    "LOAI_AUDIT",
+    "NGUOI_DUNG",
+    "THOI_GIAN",
+    "HANH_DONG",
+    "DOI_TUONG",
+    "CAU_LENH_SQL",
+    "CHI_TIET_TRANG_THAI"
+FROM (
+    -- =========================================================
+    -- NỬA TRÊN: DỮ LIỆU TỪ STANDARD AUDIT
+    -- =========================================================
+    SELECT 
+        'STANDARD' AS "LOAI_AUDIT",
+        USERNAME AS "NGUOI_DUNG",
+        -- Định dạng giống Flashback: YYYY/MM/DD HH24:MI:SS
+        TO_CHAR(EXTENDED_TIMESTAMP, 'YYYY/MM/DD HH24:MI:SS') AS "THOI_GIAN",
+        ACTION_NAME AS "HANH_DONG",
+        OWNER || '.' || OBJ_NAME AS "DOI_TUONG",
+        CAST(SQL_TEXT AS VARCHAR2(2000)) AS "CAU_LENH_SQL", 
+        CASE RETURNCODE 
+            WHEN 0 THEN 'Thành công' 
+            ELSE 'Thất bại (Mã lỗi: ' || RETURNCODE || ')' 
+        END AS "CHI_TIET_TRANG_THAI",
+        CAST(EXTENDED_TIMESTAMP AS TIMESTAMP) AS RAW_TIME 
+    FROM 
+        DBA_AUDIT_TRAIL
+    WHERE 
+        USERNAME NOT IN ('SYS', 'SYSTEM', 'DBSNMP', 'SYSMAN') 
 
+    UNION ALL
 
+    -- =========================================================
+    -- NỬA DƯỚI: DỮ LIỆU TỪ FINE-GRAINED AUDIT (FGA)
+    -- =========================================================
+    SELECT 
+        'FINE-GRAINED' AS "LOAI_AUDIT",
+        DBUSERNAME AS "NGUOI_DUNG",
+        -- Đã đồng bộ định dạng giống Flashback: YYYY/MM/DD HH24:MI:SS
+        TO_CHAR(EVENT_TIMESTAMP, 'YYYY/MM/DD HH24:MI:SS') AS "THOI_GIAN",
+        'POLICY: ' || FGA_POLICY_NAME AS "HANH_DONG",
+        OBJECT_SCHEMA || '.' || OBJECT_NAME AS "DOI_TUONG",
+        CAST(SQL_TEXT AS VARCHAR2(2000)) AS "CAU_LENH_SQL",
+        CASE 
+            WHEN FGA_POLICY_NAME LIKE '%BATHOPPHAP%' THEN 'Cảnh báo Đỏ: Hành vi bất hợp pháp'
+            WHEN FGA_POLICY_NAME LIKE '%HOPPHAP%' THEN 'Bình thường: Cập nhật đúng thẩm quyền'
+            ELSE 'Theo dõi hệ thống'
+        END AS "CHI_TIET_TRANG_THAI",
+        CAST(EVENT_TIMESTAMP AS TIMESTAMP) AS RAW_TIME 
+    FROM 
+        UNIFIED_AUDIT_TRAIL
+    WHERE 
+        FGA_POLICY_NAME IS NOT NULL 
+        AND DBUSERNAME NOT IN ('SYS', 'SYSTEM')
+        AND (
+            (FGA_POLICY_NAME = 'FGA_HSBA_CAPNHAT_HOPPHAP' AND RETURN_CODE = 0)
+            OR 
+            (FGA_POLICY_NAME != 'FGA_HSBA_CAPNHAT_HOPPHAP')
+        )
+)
+-- Sắp xếp bằng dữ liệu thời gian thật, dữ liệu đổ ra UI sẽ chuẩn xác tuyệt đối
+ORDER BY RAW_TIME DESC;
+
+select * from admin_phanhe1.v_all_audit_log;
 
