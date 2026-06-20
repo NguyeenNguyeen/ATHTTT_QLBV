@@ -36,6 +36,24 @@ namespace ADMIN
                         );
                         Application.Run(formDieuPhoiVien);
                     }
+                    else if (LoginForm.UserRole == "TECHNICIAN")
+                    {
+                        FormKyThuatVien formKyThuatVien = new FormKyThuatVien(
+                            LoginForm.LoggedInUsername,
+                            LoginForm.DoctorName,
+                            LoginForm.DoctorConnection
+                        );
+                        Application.Run(formKyThuatVien);
+                    }
+                    else if (LoginForm.UserRole == "PATIENT")
+                    {
+                        FormBenhNhan formBenhNhan = new FormBenhNhan(
+                            LoginForm.LoggedInUsername,
+                            LoginForm.DoctorName,
+                            LoginForm.DoctorConnection
+                        );
+                        Application.Run(formBenhNhan);
+                    }
                     else
                     {
                         // Mở form chính cho admin/users khác

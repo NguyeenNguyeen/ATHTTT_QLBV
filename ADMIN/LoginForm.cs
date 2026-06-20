@@ -77,27 +77,28 @@ namespace ADMIN
         }
 
         /// <summary>
-        /// Lấy role của người dùng (DOCTOR, NURSE, ADMIN, etc.)
+        /// Lấy role của người dùng (DOCTOR, DISPATCHER, TECHNICIAN, PATIENT, ADMIN, etc.)
         /// </summary>
         private string GetUserRole(OracleConnection conn, string username)
         {
             try
             {
-                string manv = username.ToUpper();
-                if (manv.StartsWith("C##"))
-                {
-                    manv = manv.Substring(3);
-                }
+                string normalizedUser = username.Trim().ToUpper();
+                string accountCode = StripCommonUserPrefix(normalizedUser);
 
-                if (manv.Contains("ADMIN"))
+                if (accountCode.Contains("ADMIN"))
                     return "ADMIN";
+
+                string roleFromSession = GetRoleFromSession(conn);
+                if (!string.IsNullOrEmpty(roleFromSession))
+                    return roleFromSession;
 
                 // Tra cứu vai trò từ bảng NHANVIEN
                 string query = "SELECT VAITRO FROM ADMIN_PHANHE1.NHANVIEN WHERE MANV = :manv";
                 using (OracleCommand cmd = new OracleCommand(query, conn))
                 {
                     cmd.BindByName = true;
-                    cmd.Parameters.Add(":manv", OracleDbType.Varchar2).Value = manv;
+                    cmd.Parameters.Add(":manv", OracleDbType.Varchar2).Value = accountCode;
                     object result = cmd.ExecuteScalar();
                     if (result != null)
                     {
@@ -110,21 +111,32 @@ namespace ADMIN
                         {
                             return "DISPATCHER";
                         }
+                        else if (vaitro == "Kỹ thuật viên")
+                        {
+                            return "TECHNICIAN";
+                        }
                     }
                 }
-                
-                // Fallback cũ nếu không tìm thấy
-                if (manv.StartsWith("NV"))
-                    return "DOCTOR";
+
+                using (OracleCommand cmd = new OracleCommand(
+                    "SELECT COUNT(*) FROM ADMIN_PHANHE1.BENHNHAN WHERE MABN = :mabn", conn))
+                {
+                    cmd.BindByName = true;
+                    cmd.Parameters.Add(":mabn", OracleDbType.Varchar2).Value = accountCode;
+                    object result = cmd.ExecuteScalar();
+                    if (result != null && Convert.ToInt32(result) > 0)
+                        return "PATIENT";
+                }
                 
                 return "USER";
             }
             catch
             {
-                if (username.ToUpper().Contains("ADMIN"))
+                string accountCode = StripCommonUserPrefix(username.Trim().ToUpper());
+                if (accountCode.Contains("ADMIN"))
                     return "ADMIN";
-                if (username.ToUpper().Contains("NV"))
-                    return "DOCTOR";
+                if (accountCode.StartsWith("BN"))
+                    return "PATIENT";
                 return "USER";
             }
         }
@@ -136,17 +148,33 @@ namespace ADMIN
         {
             try
             {
-                string manv = username.ToUpper();
-                if (manv.StartsWith("C##"))
+                string accountCode = StripCommonUserPrefix(username.Trim().ToUpper());
+
+                if (role == "PATIENT")
                 {
-                    manv = manv.Substring(3);
+                    string patientQuery = "SELECT TENBN FROM ADMIN_PHANHE1.V_RBAC_BENHNHAN_THONGTIN";
+                    using (OracleCommand cmd = new OracleCommand(patientQuery, conn))
+                    {
+                        object result = cmd.ExecuteScalar();
+                        if (result != null) return result.ToString() ?? username;
+                    }
+                }
+
+                if (role == "TECHNICIAN")
+                {
+                    string technicianQuery = "SELECT HOTEN FROM ADMIN_PHANHE1.V_RBAC_KTV_THONGTIN";
+                    using (OracleCommand cmd = new OracleCommand(technicianQuery, conn))
+                    {
+                        object result = cmd.ExecuteScalar();
+                        if (result != null) return result.ToString() ?? username;
+                    }
                 }
 
                 string query = "SELECT HOTEN FROM ADMIN_PHANHE1.NHANVIEN WHERE MANV = :manv";
                 using (OracleCommand cmd = new OracleCommand(query, conn))
                 {
                     cmd.BindByName = true;
-                    cmd.Parameters.Add(":manv", OracleDbType.Varchar2).Value = manv;
+                    cmd.Parameters.Add(":manv", OracleDbType.Varchar2).Value = accountCode;
                     object result = cmd.ExecuteScalar();
                     if (result != null) return result.ToString() ?? username;
                 }
@@ -156,6 +184,38 @@ namespace ADMIN
             {
                 return username;
             }
+        }
+
+        private static string StripCommonUserPrefix(string username)
+        {
+            return username.StartsWith("C##") ? username.Substring(3) : username;
+        }
+
+        private string GetRoleFromSession(OracleConnection conn)
+        {
+            const string query = @"
+                SELECT ROLE
+                FROM SESSION_ROLES
+                WHERE ROLE IN ('ROLE_YSI_BACSI', 'ROLE_DIEUPHOIVIEN', 'ROLE_KYTHUATVIEN', 'ROLE_BENHNHAN')";
+
+            using (OracleCommand cmd = new OracleCommand(query, conn))
+            using (OracleDataReader reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    string role = reader.GetString(0);
+                    if (role == "ROLE_YSI_BACSI")
+                        return "DOCTOR";
+                    if (role == "ROLE_DIEUPHOIVIEN")
+                        return "DISPATCHER";
+                    if (role == "ROLE_KYTHUATVIEN")
+                        return "TECHNICIAN";
+                    if (role == "ROLE_BENHNHAN")
+                        return "PATIENT";
+                }
+            }
+
+            return "";
         }
     }
 }
