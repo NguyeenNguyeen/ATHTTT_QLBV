@@ -14,9 +14,11 @@ System.Diagnostics.Process.Start("run_rman_restore.bat");
 # Data pump backup & restore (script): 2 nút
 Các file .bat cho loại này chỉ để tham khảo thôi, ti đã chuyển sang script sql ở trong file chung rồi.
 - dùng procedure ADMIN_PHANHE1.SP_BACKUP_DATAPUMP: không tham số (nó sẽ chạy khoảng > 45s tuỳ thuộc vào độ lớn dữ liệu)
-- dùng procedure ADMIN_PHANHE1.SP_RESTORE_DATAPUMP(p_table_name: VARCHAR2 default NULL): 
-    + nếu không truyền tham số: -> mặc định restore toàn bộ dữ liệu.
-    + nếu truyền tham số thì chỉ restore 1 bảng đó thôi: không khuyến nghị dùng lắm vì các bảng sẽ có các constraints các thứ, cần restore nhiều bảng để restore cả các ràng buộc đó.
+- dùng procedure ADMIN_PHANHE1.SP_RESTORE_DATAPUMP(p_file_name: VARCHAR2, p_table_name: VARCHAR2 default NULL):
+    + p_file_name: tên của file sẽ .dmp để restore - buộc phải điền vào
+    + p_table_name: không có cũng được
+        . nếu không truyền tham số: -> mặc định restore toàn bộ dữ liệu.
+        . nếu truyền tham số thì chỉ restore 1 bảng đó thôi: không khuyến nghị dùng lắm vì các bảng sẽ có các constraints các thứ, cần restore nhiều bảng để restore cả các ràng buộc đó.
 
 
 # Flashback backup & restore (script): 1 nút - restore dựa trên audit log
