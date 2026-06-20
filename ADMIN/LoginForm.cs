@@ -7,6 +7,10 @@ namespace ADMIN
     public partial class LoginForm : Form
     {
         public static string GlobalConnectionString { get; private set; } = "";
+        public static string LoggedInUsername { get; private set; } = "";
+        public static string UserRole { get; private set; } = "";
+        public static string DoctorName { get; private set; } = "";
+        public static OracleConnection? DoctorConnection { get; private set; }
 
         public LoginForm()
         {
@@ -33,8 +37,18 @@ namespace ADMIN
                 using (OracleConnection conn = new OracleConnection(connString))
                 {
                     conn.Open();
-                    // Kết nối thành công -> Đăng nhập thành công
+                    // Lấy role và tên người dùng
+                    string role = GetUserRole(conn, username);
+                    string fullName = GetUserFullName(conn, username, role);
+
+                    // Lưu thông tin vào static properties
                     GlobalConnectionString = connString;
+                    LoggedInUsername = username;
+                    UserRole = role;
+                    DoctorName = fullName;
+                    DoctorConnection = new OracleConnection(connString); // Tạo connection mới để sử dụng sau này
+                    DoctorConnection.Open();
+
                     this.DialogResult = DialogResult.OK; 
                     this.Close();
                 }
@@ -60,6 +74,88 @@ namespace ADMIN
         {
             this.DialogResult = DialogResult.Cancel;
             this.Close();
+        }
+
+        /// <summary>
+        /// Lấy role của người dùng (DOCTOR, NURSE, ADMIN, etc.)
+        /// </summary>
+        private string GetUserRole(OracleConnection conn, string username)
+        {
+            try
+            {
+                string manv = username.ToUpper();
+                if (manv.StartsWith("C##"))
+                {
+                    manv = manv.Substring(3);
+                }
+
+                if (manv.Contains("ADMIN"))
+                    return "ADMIN";
+
+                // Tra cứu vai trò từ bảng NHANVIEN
+                string query = "SELECT VAITRO FROM ADMIN_PHANHE1.NHANVIEN WHERE MANV = :manv";
+                using (OracleCommand cmd = new OracleCommand(query, conn))
+                {
+                    cmd.BindByName = true;
+                    cmd.Parameters.Add(":manv", OracleDbType.Varchar2).Value = manv;
+                    object result = cmd.ExecuteScalar();
+                    if (result != null)
+                    {
+                        string vaitro = result.ToString();
+                        if (vaitro == "Bác sĩ/Y sĩ" || vaitro == "Lãnh đạo khoa")
+                        {
+                            return "DOCTOR";
+                        }
+                        else if (vaitro == "Điều phối viên")
+                        {
+                            return "DISPATCHER";
+                        }
+                    }
+                }
+                
+                // Fallback cũ nếu không tìm thấy
+                if (manv.StartsWith("NV"))
+                    return "DOCTOR";
+                
+                return "USER";
+            }
+            catch
+            {
+                if (username.ToUpper().Contains("ADMIN"))
+                    return "ADMIN";
+                if (username.ToUpper().Contains("NV"))
+                    return "DOCTOR";
+                return "USER";
+            }
+        }
+
+        /// <summary>
+        /// Lấy tên đầy đủ người dùng từ bảng NHANVIEN
+        /// </summary>
+        private string GetUserFullName(OracleConnection conn, string username, string role)
+        {
+            try
+            {
+                string manv = username.ToUpper();
+                if (manv.StartsWith("C##"))
+                {
+                    manv = manv.Substring(3);
+                }
+
+                string query = "SELECT HOTEN FROM ADMIN_PHANHE1.NHANVIEN WHERE MANV = :manv";
+                using (OracleCommand cmd = new OracleCommand(query, conn))
+                {
+                    cmd.BindByName = true;
+                    cmd.Parameters.Add(":manv", OracleDbType.Varchar2).Value = manv;
+                    object result = cmd.ExecuteScalar();
+                    if (result != null) return result.ToString() ?? username;
+                }
+                return username;
+            }
+            catch
+            {
+                return username;
+            }
         }
     }
 }

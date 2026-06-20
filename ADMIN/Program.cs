@@ -12,13 +12,35 @@ namespace ADMIN
             // see https://aka.ms/applicationconfiguration.
             ApplicationConfiguration.Initialize();
 
-            // Hiển thị form đăng nhập trước tiên
+            // Hiển thị form đăng nhập cũ
             using (LoginForm loginForm = new LoginForm())
             {
                 if (loginForm.ShowDialog() == DialogResult.OK)
                 {
-                    // Nếu đăng nhập thành công, thì mở Form chính (Form1)
-                    Application.Run(new Form1());
+                    // Kiểm tra role người dùng - nếu là bác sĩ/y sĩ, mở FormBacSi
+                    if (LoginForm.UserRole == "DOCTOR")
+                    {
+                        FormBacSi formBacSi = new FormBacSi(
+                            LoginForm.LoggedInUsername,
+                            LoginForm.DoctorName,
+                            LoginForm.DoctorConnection
+                        );
+                        Application.Run(formBacSi);
+                    }
+                    else if (LoginForm.UserRole == "DISPATCHER")
+                    {
+                        FormDieuPhoiVien formDieuPhoiVien = new FormDieuPhoiVien(
+                            LoginForm.LoggedInUsername,
+                            LoginForm.DoctorName,
+                            LoginForm.DoctorConnection
+                        );
+                        Application.Run(formDieuPhoiVien);
+                    }
+                    else
+                    {
+                        // Mở form chính cho admin/users khác
+                        Application.Run(new Form1());
+                    }
                 }
                 else
                 {
