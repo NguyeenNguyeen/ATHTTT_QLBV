@@ -1040,30 +1040,35 @@ GRANT READ, WRITE ON DIRECTORY BACKUP_DIR TO ADMIN_PHANHE1;
 -- BACKUP && RESTORE: DATA PUMP
 -- =================================================================
 
+
+
 CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_BACKUP_DATAPUMP 
-AUTHID CURRENT_USER -- BẮT BUỘC: Ép Oracle giữ nguyên quyền của người gọi
+AUTHID CURRENT_USER 
 IS
     v_dp_handle NUMBER;
+    v_timestamp VARCHAR2(20);
 BEGIN
-    -- Thêm SS (Giây) vào tên Job để đảm bảo chạy 100 lần 1 phút vẫn không trùng tên
+    v_timestamp := TO_CHAR(SYSTIMESTAMP AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYYMMDD_HH24MISS');
+    
     v_dp_handle := DBMS_DATAPUMP.OPEN(
         operation   => 'EXPORT',
         job_mode    => 'SCHEMA',
-        job_name    => 'JOB_EXPDP_' || TO_CHAR(SYSDATE, 'YYYYMMDD_HH24MISS') 
+        job_name    => 'JOB_EXPDP_' || v_timestamp 
     );
 
+    -- Tạo file .dmp với tên có gắn mốc thời gian VN
     DBMS_DATAPUMP.ADD_FILE(
         handle    => v_dp_handle,
-        filename  => 'BV_PHANHE1.dmp',
-        directory => 'BACKUP_DIR',
-        reusefile => 1 
+        filename  => 'BV_PHANHE1_' || v_timestamp || '.dmp',
+        directory => 'BACKUP_DIR'
     );
+    
+    -- Tạo file .log với tên tương ứng
     DBMS_DATAPUMP.ADD_FILE(
         handle    => v_dp_handle,
-        filename  => 'BV_PHANHE1.log',
+        filename  => 'BV_PHANHE1_' || v_timestamp || '.log',
         directory => 'BACKUP_DIR',
-        filetype  => DBMS_DATAPUMP.KU$_FILE_TYPE_LOG_FILE,
-        reusefile => 1
+        filetype  => DBMS_DATAPUMP.KU$_FILE_TYPE_LOG_FILE
     );
 
     DBMS_DATAPUMP.METADATA_FILTER(
@@ -1075,7 +1080,7 @@ BEGIN
     DBMS_DATAPUMP.START_JOB(v_dp_handle);
     DBMS_DATAPUMP.DETACH(v_dp_handle);
     
-    DBMS_OUTPUT.PUT_LINE('Da gui yeu cau Backup Data Pump vao he thong.');
+    DBMS_OUTPUT.PUT_LINE('Da gui yeu cau Backup. Ten file: BV_PHANHE1_' || v_timestamp || '.dmp');
 EXCEPTION
     WHEN OTHERS THEN
         DBMS_OUTPUT.PUT_LINE('Loi Data Pump: ' || SQLERRM);
@@ -1084,8 +1089,8 @@ END SP_BACKUP_DATAPUMP;
 /
 
 
-
 CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_RESTORE_DATAPUMP (
+    p_filename   IN VARCHAR2, -- BẮT BUỘC: Nhận tên file do WinForm gửi xuống
     p_table_name IN VARCHAR2 DEFAULT NULL 
 ) 
 AUTHID CURRENT_USER
@@ -1098,9 +1103,10 @@ BEGIN
         job_name  => 'JOB_IMPDP_' || TO_CHAR(SYSDATE, 'YYYYMMDD_HH24MISS')
     );
 
+    -- Trỏ Data Pump vào đúng cái tên file được người dùng chọn
     DBMS_DATAPUMP.ADD_FILE(
         handle    => v_dp_handle,
-        filename  => 'BV_PHANHE1.dmp',
+        filename  => p_filename, 
         directory => 'BACKUP_DIR'
     );
 
@@ -1127,8 +1133,41 @@ BEGIN
     DBMS_DATAPUMP.START_JOB(v_dp_handle);
     DBMS_DATAPUMP.DETACH(v_dp_handle);
     
-    DBMS_OUTPUT.PUT_LINE('Da gui yeu cau Restore Data Pump vao he thong.');
+    DBMS_OUTPUT.PUT_LINE('Da gui yeu cau Restore tu file: ' || p_filename);
 END SP_RESTORE_DATAPUMP;
+/
+
+-- =========================================
+-- Lập lịch tự động backup
+-- ========================================
+BEGIN
+    -- Dọn dẹp Job cũ 
+    BEGIN
+        DBMS_SCHEDULER.DROP_JOB(job_name => 'JOB_DAILY_BACKUP', force => TRUE);
+    EXCEPTION
+        WHEN OTHERS THEN NULL; 
+    END;
+
+    -- Khởi tạo Job mới với múi giờ chuẩn
+    DBMS_SCHEDULER.CREATE_JOB (
+        job_name        => 'JOB_DAILY_BACKUP',
+        job_type        => 'STORED_PROCEDURE',
+        job_action      => 'ADMIN_PHANHE1.SP_BACKUP_DATAPUMP',
+        
+        -- [ĐIỂM SỬA CHỮA]: Gắn mốc thời gian bắt đầu theo giờ Việt Nam
+        start_date      => SYSTIMESTAMP AT TIME ZONE 'Asia/Ho_Chi_Minh',
+        
+        -- Chạy vào lúc 2h00 sáng mỗi ngày (Theo giờ VN)
+        repeat_interval => 'FREQ=DAILY; BYHOUR=2; BYMINUTE=0; BYSECOND=0',
+        -- Chạy tự động lặp lại mỗi 5 phút (Dùng để Test/Demo)
+        -- repeat_interval => 'FREQ=MINUTELY; INTERVAL=5',
+        
+        enabled         => TRUE, 
+        comments        => 'Tu dong chay SP_BACKUP_DATAPUMP vao luc 2h sang VN moi ngay'
+    );
+    
+    DBMS_OUTPUT.PUT_LINE('Da thiet lap thanh cong lich Backup theo mui gio Viet Nam!');
+END;
 /
 
 -- CHECK 
