@@ -3,7 +3,7 @@ echo =========================================
 echo BAT DAU SAO LUU HE THONG (RMAN HOT BACKUP)
 echo =========================================
 
-:: Tao thu muc neu chua co tren may Windows
+:: Tao thu muc neu chua co tren may Windows (ĐƯỜNG DẪN NÀY LÀ ĐƯỜNG DẪN ĐƯỢC TẠO TRONG SCRIPT CREATE OR REPLACE DIRECTORY...)
 if not exist "C:\Backup_Oracle" mkdir "C:\Backup_Oracle"
 
 :: 1. Tao file RMAN tam thoi

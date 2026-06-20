@@ -1,10 +1,15 @@
 
 
+-- =====================================================================
+-- AUDIT (START)
+-- =====================================================================
+
+
 GRANT SELECT ON SYS.DBA_AUDIT_TRAIL TO ADMIN_PHANHE1;
 GRANT SELECT ON AUDSYS.UNIFIED_AUDIT_TRAIL TO ADMIN_PHANHE1;
 
 -- =====================================================================
--- STANDARD AUDIT
+-- CÀI ĐẶT TÌNH HUỐNG STANDARD AUDIT
 -- =====================================================================
 
 -- xem cấu hình audit hiện tại có DB_EXTENDED chưa, chưa thì đổi bằng dòng ALTER bên dưới
@@ -36,15 +41,15 @@ AUDIT INSERT, UPDATE, DELETE ON ADMIN_PHANHE1.HSBA BY ACCESS;
 -- Ghi log mỗi khi có người đọc dữ liệu này.
 -- =====================================================================
 -- Lưu ý: Đổi 'V_HSBA_BACSI' thành tên View thực tế của nhóm.
--- AUDIT SELECT ON V_HSBA_BACSI BY ACCESS;
+AUDIT SELECT ON V_ALL_AUDIT_LOG BY ACCESS;
 
 -- =====================================================================
--- NGỮ CẢNH 4: Giám sát Thủ tục (Stored Procedure / Function)
+-- NGỮ CẢNH 4: Giám sát Stored Procedure
 -- Ý nghĩa: Giám sát việc thực thi các thủ tục có tính rủi ro cao. 
 -- Ví dụ: Giám sát xem ai đã chạy thủ tục tạo hồ sơ bệnh án mới.
 -- =====================================================================
 -- Lưu ý: Đổi 'SP_TAO_HSBA' thành tên Procedure thực tế của nhóm.
--- AUDIT EXECUTE ON SP_TAO_HSBA BY ACCESS;
+AUDIT EXECUTE ON ADMIN_PHANHE1.SP_RESTORE_FLASHBACK BY ACCESS;
 
 -- =====================================================================
 -- NGỮ CẢNH 5: Giám sát Cấu trúc (DDL) - Bảo vệ Schema
@@ -56,14 +61,13 @@ AUDIT TABLE BY ACCESS;
 
 
 -- =====================================================================
--- FINE-GRAINED AUDIT
+-- CÀI ĐẶT TÌNH HUỐNG FINE-GRAINED AUDIT
 -- =====================================================================
-
-BEGIN
-    -- =====================================================================
-    -- 3a. Giám sát Bác sĩ cập nhật ĐƠN THUỐC sau khi đã chỉ định
-    -- Ý nghĩa: Bất kỳ lệnh UPDATE nào trên các cột cấu thành đơn thuốc đều bị ghi log.
-    -- =====================================================================
+-- =====================================================================
+-- 3a. Giám sát Bác sĩ cập nhật ĐƠN THUỐC sau khi đã chỉ định
+-- Ý nghĩa: Bất kỳ lệnh UPDATE nào trên các cột cấu thành đơn thuốc đều bị ghi log.
+-- =====================================================================
+BEGIN 
     DBMS_FGA.ADD_POLICY(
         object_schema   => 'ADMIN_PHANHE1',
         object_name     => 'DONTHUOC',
@@ -83,6 +87,7 @@ BEGIN
             )',
         statement_types => 'UPDATE'
     );
+END;
 
     -- =====================================================================
     -- 3b. Giám sát hành vi Bác sĩ cập nhật HỢP PHÁP trên HSBA
@@ -90,6 +95,7 @@ BEGIN
     -- cho chính hồ sơ mà mình phụ trách.
     -- (Giả định user đăng nhập có dạng C##NV004 và MABS lưu là NV004)
     -- =====================================================================
+BEGIN
     DBMS_FGA.ADD_POLICY(
         object_schema   => 'ADMIN_PHANHE1',
         object_name     => 'HSBA',
@@ -101,22 +107,25 @@ BEGIN
         AND SYS_CONTEXT(''USERENV'', ''SESSION_USER'') = ''C##'' || UPPER(MABS)',
         statement_types => 'UPDATE'
     );
-
+END;
+/
     -- =====================================================================
     -- 3c. Giám sát hành vi cập nhật BẤT HỢP PHÁP trên HSBA
     -- Ý nghĩa: Một người không phải là Bác sĩ phụ trách hồ sơ đó (hoặc KTV/Điều phối viên)
     -- lén sửa Chẩn đoán/Điều trị/Kết luận.
     -- =====================================================================
+BEGIN
     DBMS_FGA.ADD_POLICY(
         object_schema   => 'ADMIN_PHANHE1',
         object_name     => 'HSBA',
         policy_name     => 'FGA_HSBA_CAPNHAT_BATHOPPHAP',
         audit_column    => 'CHANDOAN, DIEUTRI, KETLUAN',
-        -- Điều kiện: Tên user KHÔNG TRÙNG với mã Bác sĩ phụ trách VÀ không phải DBA
+        -- Điều kiện: Tên user KHÔNG TRÙNG với mã Bác sĩ phụ trách
         audit_condition => 'SYS_CONTEXT(''USERENV'', ''SESSION_USER'') != ''C##'' || UPPER(MABS)',
         statement_types => 'UPDATE'
     );
-
+END;
+/
     -- =====================================================================
     -- 3d. Giám sát hành vi Thêm/Xóa/Sửa BẤT HỢP PHÁP trên HSBA_DV
     -- Ý nghĩa: Lưu vết mọi hành vi can thiệp vào bảng Dịch vụ khi người đó 
@@ -126,50 +135,71 @@ BEGIN
 
     -- =====================================================================
     -- 3d.1. Bắt lỗi INSERT, DELETE bất hợp pháp trên HSBA_DV
-    -- Logic: Chỉ Bác sĩ (và Admin) mới được quyền Thêm/Xóa. 
+    -- Logic: Chỉ Bác sĩ mới được quyền Thêm/Xóa. 
     -- Nếu người làm KHÔNG PHẢI Bác sĩ (ví dụ KTV, ĐPV lén xóa) -> Ghi log!
     -- =====================================================================
+BEGIN
     DBMS_FGA.ADD_POLICY(
         object_schema   => 'ADMIN_PHANHE1',
         object_name     => 'HSBA_DV',
         policy_name     => 'FGA_HSBADV_INS_DEL_BATHOPPHAP',
-        -- Điều kiện: Trả về TRUE (ghi log) nếu KHÔNG có Role Bác sĩ VÀ không phải Admin
         audit_condition => 'SYS_CONTEXT(''SYS_SESSION_ROLES'', ''ROLE_YSI_BACSI'') = ''FALSE''',
         statement_types => 'INSERT, DELETE'
     );
-
+END;
+/
     -- =====================================================================
     -- 3d.2. Bắt lỗi UPDATE bất hợp pháp lên các cột "Cấm sửa"
-    -- Logic: Bác sĩ chỉ được thêm/xóa (không được sửa). KTV chỉ được sửa cột KETQUA.
-    -- Vậy nếu có ai đó SỬA các cột gốc (MAHSBA, MADV, NGAY, MAKTV...) thì 100% là bất hợp pháp.
+    -- Logic: Bác sĩ chỉ được thêm/xóa (không được sửa). KTV chỉ được sửa cột KETQUA, ĐPV chỉ được sửa cột MAKTV.
+    -- Vậy nếu có ai đó SỬA các cột gốc (MAHSBA, MADV, NGAY, ...) thì 100% là bất hợp pháp.
     -- (Giả định bảng có các cột này, bạn có thể điều chỉnh tên cột cho khớp đồ án)
     -- =====================================================================
+BEGIN
     DBMS_FGA.ADD_POLICY(
         object_schema   => 'ADMIN_PHANHE1',
         object_name     => 'HSBA_DV',
         policy_name     => 'FGA_HSBADV_UPD_COT_CAM_BATHOPPHAP',
-        audit_column    => 'MAHSBA, MADV, NGAY, MAKTV', -- Liệt kê TẤT CẢ CÁC CỘT TRỪ cột KETQUA
+        audit_column    => 'MAHSBA, MADV, NGAY', -- Liệt kê TẤT CẢ CÁC CỘT TRỪ cột KETQUA, MAKTV
         -- Điều kiện: Cứ sửa các cột này là bắt lỗi tất cả mọi người 
         audit_condition => NULL,
         statement_types => 'UPDATE'
     );
-
+END;
+/
     -- =====================================================================
-    -- 3d.3. Bắt lỗi UPDATE bất hợp pháp lên cột KETQUA
+    -- 3d.3. Bắt lỗi UPDATE bất hợp pháp lên cột MAKTV
+    -- Logic: Chỉ ĐPV mới được quyền sửa cột MAKTV.
+    -- Nếu người sửa KHÔNG PHẢI ĐPV (ví dụ Bác sĩ, KTV GHI SAI MAKTV) -> Ghi log!
+    -- =====================================================================    
+BEGIN
+    DBMS_FGA.ADD_POLICY(
+        object_schema   => 'ADMIN_PHANHE1',
+        object_name     => 'HSBA_DV',
+        policy_name     => 'FGA_HSBADV_UPD_MAKTV_BATHOPPHAP',
+        audit_column    => 'MAKTV',
+        audit_condition => 'SYS_CONTEXT(''SYS_SESSION_ROLES'', ''ROLE_DIEUPHOIVIEN'') = ''FALSE''',
+        statement_types => 'UPDATE'
+    );
+END;
+/
+    -- =====================================================================
+    -- 3d.4. Bắt lỗi UPDATE bất hợp pháp lên cột KETQUA
     -- Logic: Chỉ KTV mới được quyền sửa cột KẾT QUẢ.
     -- Nếu người sửa KHÔNG PHẢI KTV (ví dụ Bác sĩ, ĐPV lén ghi kết quả khống) -> Ghi log!
     -- =====================================================================    
+BEGIN
     DBMS_FGA.ADD_POLICY(
         object_schema   => 'ADMIN_PHANHE1',
         object_name     => 'HSBA_DV',
         policy_name     => 'FGA_HSBADV_UPD_KETQUA_BATHOPPHAP',
         audit_column    => 'KETQUA',
-        -- Điều kiện: Trả về TRUE (ghi log) nếu KHÔNG có Role KTV VÀ không phải Admin
         audit_condition => 'SYS_CONTEXT(''USERENV'', ''SESSION_USER'') != ''C##'' || UPPER(MAKTV)',
         statement_types => 'UPDATE'
     );
-
-    -- HO TRO
+END;
+/
+    -- HO TRO THEM DE THOA YEU CAU GHI AUDIT CUAR KTV
+BEGIN
     DBMS_FGA.ADD_POLICY(
         object_schema => 'ADMIN_PHANHE1',
         object_name => 'HSBA_DV',
@@ -178,8 +208,8 @@ BEGIN
         audit_condition => 'SYS_CONTEXT(''SYS_SESSION_ROLE'', ''ROLE_KYTHUATVIEN'') = ''TRUE''
         AND SYS_CONTEXT(''USERENV'', ''SESSION_USER'') = ''C##'' || UPPER(MAKTV)',
         statement_types => 'UPDATE'
-    );   
-END;
+    );
+END;   
 /
 
 
@@ -251,3 +281,7 @@ ORDER BY RAW_TIME DESC;
 
 select * from admin_phanhe1.v_all_audit_log;
 
+
+-- =====================================================================
+-- AUDIT (END)
+-- =====================================================================

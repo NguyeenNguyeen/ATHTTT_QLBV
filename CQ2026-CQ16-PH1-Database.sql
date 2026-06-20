@@ -1028,12 +1028,17 @@ END;
 
 
 -- =================================================================
--- 0. BACKUP && RESTORE (START)
+-- BACKUP && RESTORE (START)
 -- =================================================================
 
--- DATA PUMP
+-- THAY ĐÔI THÀNH ĐƯỜNG DẪN THÍCH HỢP TRONG WINDOW: 1 THƯ MỤC ĐỂ LƯU CÁC FILE BACKUP CD: C:\Backup_Oracle
+CREATE OR REPLACE DIRECTORY BACKUP_DIR AS '/backup'; 
+GRANT READ, WRITE ON DIRECTORY BACKUP_DIR TO system;
+GRANT READ, WRITE ON DIRECTORY BACKUP_DIR TO ADMIN_PHANHE1;
 
-
+-- =================================================================
+-- BACKUP && RESTORE: DATA PUMP
+-- =================================================================
 
 CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_BACKUP_DATAPUMP 
 AUTHID CURRENT_USER -- BẮT BUỘC: Ép Oracle giữ nguyên quyền của người gọi
@@ -1127,14 +1132,16 @@ END SP_RESTORE_DATAPUMP;
 /
 
 -- CHECK 
-SELECT OBJECT_NAME, OBJECT_TYPE, ORACLE_MAINTAINED 
-FROM DBA_OBJECTS 
-WHERE OWNER = 'ADMIN_PHANHE1';
+-- SELECT OBJECT_NAME, OBJECT_TYPE, ORACLE_MAINTAINED 
+-- FROM DBA_OBJECTS 
+-- WHERE OWNER = 'ADMIN_PHANHE1';
 
--- FLASHBACK RESTORE
--- ==============================================================================
--- SCRIPT CÀI ĐẶT TÍNH NĂNG KHÔI PHỤC DỮ LIỆU TỪ AUDIT LOG (FLASHBACK)
--- ==============================================================================
+
+
+-- =================================================================
+-- BACKUP && RESTORE: FLASHBACK - KHÔI PHỤC DỮ LIỆU TỪ AUDIT LOG
+-- =================================================================
+
 -- CẤP CÁC QUYỀN CẦN THIẾT ĐỂ BACKUP VÀ RESTORE
 -- TẠO VÀ CẤP QUYỀN ĐỂ DÙNG FLASHBACK RESTORE
 -- 1. Tao mot kho luu tru ngam ten la FDA_PHANHE1, dung luong toi da 1GB, luu lich su 1 nam
@@ -1177,11 +1184,312 @@ EXCEPTION
         RAISE; 
 END SP_RESTORE_FLASHBACK;
 /
-
-
-
-
 -- =================================================================
--- 0. BACKUP && RESTORE (END)
+-- BACKUP && RESTORE (END)
 -- =================================================================
 
+
+
+
+
+-- =====================================================================
+-- AUDIT (START)
+-- =====================================================================
+
+SELECT object_name,
+       policy_name,
+       enabled,
+       policy_text
+FROM dba_audit_policies
+WHERE object_name = 'HSBA_DV';
+
+
+
+GRANT SELECT ON SYS.DBA_AUDIT_TRAIL TO ADMIN_PHANHE1;
+GRANT SELECT ON SYS.DBA_FGA_AUDIT_TRAIL TO ADMIN_PHANHE1;
+
+-- CHỈ CẦN 1 TRANG ĐỂ SELECT * FROM VIEW ADMIN_PHANHE1.V_ALL_AUDIT_LOG ĐỂ XEM TẤT CẢ CÁC LOGS
+
+CREATE OR REPLACE VIEW ADMIN_PHANHE1.V_ALL_AUDIT_LOG AS
+SELECT 
+    "LOAI_AUDIT",
+    "NGUOI_DUNG",
+    "THOI_GIAN",
+    "HANH_DONG",
+    "DOI_TUONG",
+    "CAU_LENH_SQL",
+    "CHI_TIET_TRANG_THAI"
+FROM (
+    -- =========================================================
+    -- NỬA TRÊN: DỮ LIỆU TỪ STANDARD AUDIT
+    -- =========================================================
+    SELECT 
+        'STANDARD' AS "LOAI_AUDIT",
+        USERNAME AS "NGUOI_DUNG",
+        TO_CHAR(EXTENDED_TIMESTAMP, 'YYYY/MM/DD HH24:MI:SS') AS "THOI_GIAN",
+        ACTION_NAME AS "HANH_DONG",
+        OWNER || '.' || OBJ_NAME AS "DOI_TUONG",
+        CAST(SQL_TEXT AS VARCHAR2(2000)) AS "CAU_LENH_SQL", 
+        CASE RETURNCODE 
+            WHEN 0 THEN 'Thành công' 
+            ELSE 'Thất bại (Mã lỗi: ' || RETURNCODE || ')' 
+        END AS "CHI_TIET_TRANG_THAI",
+        CAST(EXTENDED_TIMESTAMP AS TIMESTAMP) AS RAW_TIME 
+    FROM 
+        DBA_AUDIT_TRAIL
+    WHERE 
+        USERNAME NOT IN ('SYS', 'SYSTEM', 'DBSNMP', 'SYSMAN') 
+
+    UNION ALL
+
+    -- =========================================================
+    -- NỬA DƯỚI: DỮ LIỆU TỪ FINE-GRAINED AUDIT (DÙNG BẢNG FGA GỐC)
+    -- =========================================================
+    SELECT 
+        'FINE-GRAINED' AS "LOAI_AUDIT",
+        DB_USER AS "NGUOI_DUNG", -- Đã đổi tên cột cho khớp
+        TO_CHAR(EXTENDED_TIMESTAMP, 'YYYY/MM/DD HH24:MI:SS') AS "THOI_GIAN", 
+        'POLICY: ' || POLICY_NAME AS "HANH_DONG", -- Đã đổi tên cột
+        OBJECT_SCHEMA || '.' || OBJECT_NAME AS "DOI_TUONG",
+        CAST(SQL_TEXT AS VARCHAR2(2000)) AS "CAU_LENH_SQL",
+        CASE 
+            WHEN POLICY_NAME LIKE '%BATHOPPHAP%' THEN 'Thành công (Hành vi bất hợp pháp)'
+            WHEN POLICY_NAME LIKE '%HOPPHAP%' THEN 'Thành công (Hành vi đúng thẩm quyền)'
+            ELSE 'Thành công (Đã ghi nhận)'
+        END AS "CHI_TIET_TRANG_THAI",
+        CAST(EXTENDED_TIMESTAMP AS TIMESTAMP) AS RAW_TIME 
+    FROM 
+        DBA_FGA_AUDIT_TRAIL -- Chuyển hướng sang bảng FGA truyền thống
+    WHERE 
+        POLICY_NAME IS NOT NULL 
+        AND DB_USER NOT IN ('SYS', 'SYSTEM')
+)
+-- Sắp xếp bằng dữ liệu thời gian thật, dữ liệu đổ ra UI sẽ chuẩn xác tuyệt đối
+ORDER BY RAW_TIME DESC;
+
+-- select * from admin_phanhe1.v_all_audit_log;
+
+
+-- =====================================================================
+-- CÀI ĐẶT TÌNH HUỐNG STANDARD AUDIT
+-- =====================================================================
+
+-- xem cấu hình audit hiện tại có DB_EXTENDED chưa, chưa thì đổi bằng dòng ALTER bên dưới
+SHOW PARAMETER audit_trail;
+
+-- Nếu audit_trail chưa được bật hoặc không phải là DB hoặc DB, EXTENDED thì cần bật bằng câu lệnh sau:
+ALTER SYSTEM SET audit_trail = DB, EXTENDED SCOPE = SPFILE;
+-- Cần tắt và khởi động lại database để thay đổi có hiệu lực:
+-- SHUTDOWN IMMEDIATE;
+-- STARTUP;
+
+-- =====================================================================
+-- NGỮ CẢNH 1: Giám sát Hệ thống - Đăng nhập thất bại (Session)
+-- Ý nghĩa: Phát hiện các cuộc tấn công Brute-force dò mật khẩu vào hệ thống.
+-- =====================================================================
+AUDIT SESSION WHENEVER NOT SUCCESSFUL;
+
+-- =====================================================================
+-- NGỮ CẢNH 2: Giám sát Bảng (Table) - Thay đổi dữ liệu hồ sơ bệnh án
+-- Ý nghĩa: Bảng HSBA là dữ liệu cốt lõi. Giám sát mọi hành vi Thêm/Xóa/Sửa 
+-- (cả thành công lẫn thất bại) trên bảng này.
+-- =====================================================================
+AUDIT INSERT, UPDATE, DELETE ON ADMIN_PHANHE1.HSBA BY ACCESS;
+
+-- =====================================================================
+-- NGỮ CẢNH 3: Giám sát View - Truy xuất dữ liệu nhạy cảm
+-- Ý nghĩa: Giám sát hành vi truy vấn (SELECT) trên View hồ sơ bệnh án 
+-- (Giả sử bạn có 1 view tên là V_HSBA_BACSI để bác sĩ xem hồ sơ).
+-- Ghi log mỗi khi có người đọc dữ liệu này.
+-- =====================================================================
+-- Lưu ý: Đổi 'V_HSBA_BACSI' thành tên View thực tế của nhóm.
+AUDIT SELECT ON V_ALL_AUDIT_LOG BY ACCESS;
+
+-- =====================================================================
+-- NGỮ CẢNH 4: Giám sát Stored Procedure
+-- Ý nghĩa: Giám sát việc thực thi các thủ tục có tính rủi ro cao. 
+-- Ví dụ: Giám sát xem ai đã chạy thủ tục tạo hồ sơ bệnh án mới.
+-- =====================================================================
+-- Lưu ý: Đổi 'SP_TAO_HSBA' thành tên Procedure thực tế của nhóm.
+AUDIT EXECUTE ON ADMIN_PHANHE1.SP_RESTORE_FLASHBACK BY ACCESS;
+
+-- =====================================================================
+-- NGỮ CẢNH 5: Giám sát Cấu trúc (DDL) - Bảo vệ Schema
+-- Ý nghĩa: Phát hiện các hành vi cố tình thay đổi cấu trúc bảng (CREATE, ALTER, DROP, TRUNCATE) 
+-- =====================================================================
+AUDIT TABLE BY ACCESS;
+
+
+-- =====================================================================
+-- BƯỚC 1: XÓA SẠCH CÁC POLICY CŨ BỊ LỖI CHÍNH TẢ ĐỂ LÀM SẠCH BẢNG
+-- =====================================================================
+BEGIN
+    -- Xóa trên bảng DONTHUOC
+    BEGIN DBMS_FGA.DROP_POLICY('ADMIN_PHANHE1', 'DONTHUOC', 'FGA_DONTHUOC_CAPNHAT_SAUDINH'); EXCEPTION WHEN OTHERS THEN NULL; END;
+    
+    -- Xóa trên bảng HSBA
+    BEGIN DBMS_FGA.DROP_POLICY('ADMIN_PHANHE1', 'HSBA', 'FGA_HSBA_CAPNHAT_HOPPHAP'); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DBMS_FGA.DROP_POLICY('ADMIN_PHANHE1', 'HSBA', 'FGA_HSBA_CAPNHAT_BATHOPPHAP'); EXCEPTION WHEN OTHERS THEN NULL; END;
+    
+    -- Xóa trên bảng HSBA_DV
+    BEGIN DBMS_FGA.DROP_POLICY('ADMIN_PHANHE1', 'HSBA_DV', 'FGA_HSBADV_INS_DEL_BATHOPPHAP'); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DBMS_FGA.DROP_POLICY('ADMIN_PHANHE1', 'HSBA_DV', 'FGA_HSBADV_UPD_COT_CAM_BATHOPPHAP'); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DBMS_FGA.DROP_POLICY('ADMIN_PHANHE1', 'HSBA_DV', 'FGA_HSBADV_UPD_MAKTV_BATHOPPHAP'); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DBMS_FGA.DROP_POLICY('ADMIN_PHANHE1', 'HSBA_DV', 'FGA_HSBADV_UPD_KETQUA_BATHOPPHAP'); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DBMS_FGA.DROP_POLICY('ADMIN_PHANHE1', 'HSBA_DV', 'FGA_HSBADV_KTV_CAPNHAT_HOPPHAP'); EXCEPTION WHEN OTHERS THEN NULL; END;
+END;
+/
+
+-- =====================================================================
+-- CÀI ĐẶT TÌNH HUỐNG FINE-GRAINED AUDIT
+-- =====================================================================
+
+-- 1. Hàm cho 3a (Bảng DONTHUOC)
+CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_DONTHUOC_SAUDINH(p_MAHSBA VARCHAR2) RETURN VARCHAR2 AS
+    v_is_bs VARCHAR2(10);
+    v_count NUMBER;
+BEGIN
+    v_is_bs := SYS_CONTEXT('SYS_SESSION_ROLES', 'ROLE_YSI_BACSI');
+    -- Dùng Subquery trong PL/SQL thì vô tư, không bị FGA cấm
+    SELECT COUNT(*) INTO v_count FROM ADMIN_PHANHE1.HSBA 
+    WHERE MAHSBA = p_MAHSBA AND 'C##' || UPPER(MABS) = SYS_CONTEXT('USERENV', 'SESSION_USER');
+    
+    IF v_is_bs = 'TRUE' AND v_count > 0 THEN RETURN 'TRUE'; ELSE RETURN 'FALSE'; END IF;
+EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
+/
+
+-- 2. Hàm cho 3b (Bảng HSBA - Hợp pháp)
+CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_HSBA_HOPPHAP(p_MABS VARCHAR2) RETURN VARCHAR2 AS
+BEGIN
+    IF SYS_CONTEXT('SYS_SESSION_ROLES', 'ROLE_YSI_BACSI') = 'TRUE' AND 
+       SYS_CONTEXT('USERENV', 'SESSION_USER') = 'C##' || UPPER(p_MABS) THEN
+        RETURN 'TRUE';
+    ELSE RETURN 'FALSE'; END IF;
+EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
+/
+
+-- 3. Hàm cho 3c (Bảng HSBA - Bất hợp pháp)
+CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_HSBA_BATHOPPHAP(p_MABS VARCHAR2) RETURN VARCHAR2 AS
+BEGIN
+    IF SYS_CONTEXT('USERENV', 'SESSION_USER') != 'C##' || UPPER(p_MABS) THEN RETURN 'TRUE'; ELSE RETURN 'FALSE'; END IF;
+EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
+/
+
+-- 4. Hàm cho 3d.1 (Bảng HSBA_DV - Kiểm tra KHÔNG phải Bác sĩ)
+CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_NOT_BACSI RETURN VARCHAR2 AS
+BEGIN
+    IF SYS_CONTEXT('SYS_SESSION_ROLES', 'ROLE_YSI_BACSI') = 'FALSE' THEN RETURN 'TRUE'; ELSE RETURN 'FALSE'; END IF;
+EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
+/
+
+-- 5. Hàm cho 3d.3 (Bảng HSBA_DV - Kiểm tra KHÔNG phải Điều phối viên)
+CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_NOT_DPV RETURN VARCHAR2 AS
+BEGIN
+    IF SYS_CONTEXT('SYS_SESSION_ROLES', 'ROLE_DIEUPHOIVIEN') = 'FALSE' THEN RETURN 'TRUE'; ELSE RETURN 'FALSE'; END IF;
+EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
+/
+
+-- 6. Hàm cho 3d.4 (Bảng HSBA_DV - Kiểm tra KHÔNG phải KTV phụ trách)
+CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_NOT_KTV_CHINHLU(p_MAKTV VARCHAR2) RETURN VARCHAR2 AS
+BEGIN
+    IF SYS_CONTEXT('USERENV', 'SESSION_USER') != 'C##' || UPPER(p_MAKTV) THEN RETURN 'TRUE'; ELSE RETURN 'FALSE'; END IF;
+EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
+/
+
+-- 7. Hàm cho 3d.5 (Bảng HSBA_DV - Kiểm tra KTV Hợp pháp)
+CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_KTV_HOPPHAP(p_MAKTV VARCHAR2) RETURN VARCHAR2 AS
+BEGIN
+    IF SYS_CONTEXT('SYS_SESSION_ROLES', 'ROLE_KYTHUATVIEN') = 'TRUE' AND 
+       SYS_CONTEXT('USERENV', 'SESSION_USER') = 'C##' || UPPER(p_MAKTV) THEN
+        RETURN 'TRUE';
+    ELSE RETURN 'FALSE'; END IF;
+EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
+/
+
+
+BEGIN
+    -- 3a. Giám sát Bác sĩ cập nhật ĐƠN THUỐC sau khi đã chỉ định
+    DBMS_FGA.ADD_POLICY(
+        object_schema   => 'ADMIN_PHANHE1',
+        object_name     => 'DONTHUOC',
+        policy_name     => 'FGA_DONTHUOC_CAPNHAT_SAUDINH',
+        audit_column    => 'MAHSBA, NGAYDT, TENTHUOC, LIEUDUNG',
+        audit_condition => 'ADMIN_PHANHE1.FN_FGA_DONTHUOC_SAUDINH(MAHSBA) = ''TRUE''',
+        statement_types => 'UPDATE'
+    );
+
+    -- 3b. Giám sát hành vi Bác sĩ cập nhật HỢP PHÁP trên HSBA
+    DBMS_FGA.ADD_POLICY(
+        object_schema   => 'ADMIN_PHANHE1',
+        object_name     => 'HSBA',
+        policy_name     => 'FGA_HSBA_CAPNHAT_HOPPHAP',
+        audit_column    => 'CHANDOAN, DIEUTRI, KETLUAN',
+        audit_condition => 'ADMIN_PHANHE1.FN_FGA_HSBA_HOPPHAP(MABS) = ''TRUE''',
+        statement_types => 'UPDATE'
+    );
+
+    -- 3c. Giám sát hành vi cập nhật BẤT HỢP PHÁP trên HSBA
+    DBMS_FGA.ADD_POLICY(
+        object_schema   => 'ADMIN_PHANHE1',
+        object_name     => 'HSBA',
+        policy_name     => 'FGA_HSBA_CAPNHAT_BATHOPPHAP',
+        audit_column    => 'CHANDOAN, DIEUTRI, KETLUAN',
+        audit_condition => 'ADMIN_PHANHE1.FN_FGA_HSBA_BATHOPPHAP(MABS) = ''TRUE''',
+        statement_types => 'UPDATE'
+    );
+
+    -- 3d.1. Bắt lỗi INSERT, DELETE bất hợp pháp trên HSBA_DV
+    DBMS_FGA.ADD_POLICY(
+        object_schema   => 'ADMIN_PHANHE1',
+        object_name     => 'HSBA_DV',
+        policy_name     => 'FGA_HSBADV_INS_DEL_BATHOPPHAP',
+        -- Vì không truyền tham số cột nào vào nên bỏ ngoặc
+        audit_condition => 'ADMIN_PHANHE1.FN_FGA_NOT_BACSI() = ''TRUE''',
+        statement_types => 'INSERT, DELETE'
+    );
+
+    -- 3d.2. Bắt lỗi UPDATE bất hợp pháp lên các cột "Cấm sửa"
+    DBMS_FGA.ADD_POLICY(
+        object_schema   => 'ADMIN_PHANHE1',
+        object_name     => 'HSBA_DV',
+        policy_name     => 'FGA_HSBADV_UPD_COT_CAM_BATHOPPHAP',
+        audit_column    => 'MAHSBA, LOAIDV, NGAYDV',
+        audit_condition => NULL, -- Giữ nguyên NULL vì bắt tất cả
+        statement_types => 'UPDATE'
+    );
+
+    -- 3d.3. Bắt lỗi UPDATE bất hợp pháp lên cột MAKTV
+    DBMS_FGA.ADD_POLICY(
+        object_schema   => 'ADMIN_PHANHE1',
+        object_name     => 'HSBA_DV',
+        policy_name     => 'FGA_HSBADV_UPD_MAKTV_BATHOPPHAP',
+        audit_column    => 'MAKTV',
+        audit_condition => 'ADMIN_PHANHE1.FN_FGA_NOT_DPV() = ''TRUE''',
+        statement_types => 'UPDATE'
+    );
+
+    -- 3d.4. Bắt lỗi UPDATE bất hợp pháp lên cột KETQUA
+    DBMS_FGA.ADD_POLICY(
+        object_schema   => 'ADMIN_PHANHE1',
+        object_name     => 'HSBA_DV',
+        policy_name     => 'FGA_HSBADV_UPD_KETQUA_BATHOPPHAP',
+        audit_column    => 'KETQUA',
+        audit_condition => 'ADMIN_PHANHE1.FN_FGA_NOT_KTV_CHINHLU(MAKTV) = ''TRUE''',
+        statement_types => 'UPDATE'
+    );
+
+    -- 3d.5. KTV cập nhật HỢP PHÁP
+    DBMS_FGA.ADD_POLICY(
+        object_schema   => 'ADMIN_PHANHE1',
+        object_name     => 'HSBA_DV',
+        policy_name     => 'FGA_HSBADV_KTV_CAPNHAT_HOPPHAP',
+        audit_column    => 'KETQUA',
+        audit_condition => 'ADMIN_PHANHE1.FN_FGA_KTV_HOPPHAP(MAKTV) = ''TRUE''',
+        statement_types => 'UPDATE'
+    );   
+END;
+/
+
+-- =====================================================================
+-- AUDIT (END)
+-- =====================================================================
