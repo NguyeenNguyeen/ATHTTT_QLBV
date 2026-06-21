@@ -90,6 +90,7 @@ namespace ADMIN
 
             dgvProfile = CreateGrid();
             tabProfile.Controls.Add(dgvProfile);
+            dgvProfile.BringToFront();
         }
 
         private void SetupServiceTab()
@@ -110,6 +111,7 @@ namespace ADMIN
 
             dgvServices = CreateGrid();
             tabServices.Controls.Add(dgvServices);
+            dgvServices.BringToFront();
         }
 
         private Button CreateButton(string text, Point location, Color color, int width = 100)

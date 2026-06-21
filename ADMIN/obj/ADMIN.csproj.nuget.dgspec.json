@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "E:\\Desktop\\ATBM_FINAL\\ATHTTT_QLBV\\ADMIN\\ADMIN.csproj": {}
+    "e:\\Desktop\\ATBM_FINAL\\ATHTTT_QLBV\\ADMIN\\ADMIN.csproj": {}
   },
   "projects": {
-    "E:\\Desktop\\ATBM_FINAL\\ATHTTT_QLBV\\ADMIN\\ADMIN.csproj": {
+    "e:\\Desktop\\ATBM_FINAL\\ATHTTT_QLBV\\ADMIN\\ADMIN.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "E:\\Desktop\\ATBM_FINAL\\ATHTTT_QLBV\\ADMIN\\ADMIN.csproj",
+        "projectUniqueName": "e:\\Desktop\\ATBM_FINAL\\ATHTTT_QLBV\\ADMIN\\ADMIN.csproj",
         "projectName": "ADMIN",
-        "projectPath": "E:\\Desktop\\ATBM_FINAL\\ATHTTT_QLBV\\ADMIN\\ADMIN.csproj",
+        "projectPath": "e:\\Desktop\\ATBM_FINAL\\ATHTTT_QLBV\\ADMIN\\ADMIN.csproj",
         "packagesPath": "C:\\Users\\Admin\\.nuget\\packages\\",
-        "outputPath": "E:\\Desktop\\ATBM_FINAL\\ATHTTT_QLBV\\ADMIN\\obj\\",
+        "outputPath": "e:\\Desktop\\ATBM_FINAL\\ATHTTT_QLBV\\ADMIN\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -30,8 +30,7 @@
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
-          "net10.0-windows": {
-            "framework": "net10.0-windows7.0",
+          "net10.0-windows7.0": {
             "targetAlias": "net10.0-windows",
             "projectReferences": {}
           }
@@ -49,8 +48,7 @@
         "SdkAnalysisLevel": "10.0.200"
       },
       "frameworks": {
-        "net10.0-windows": {
-          "framework": "net10.0-windows7.0",
+        "net10.0-windows7.0": {
           "targetAlias": "net10.0-windows",
           "dependencies": {
             "Oracle.ManagedDataAccess.Core": {

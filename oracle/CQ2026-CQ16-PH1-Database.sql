@@ -25,6 +25,8 @@ ALTER USER ADMIN_PHANHE1 QUOTA UNLIMITED ON USERS;
 GRANT DBA TO ADMIN_PHANHE1;
 GRANT ALTER SYSTEM TO ADMIN_PHANHE1;
 GRANT SELECT ON v_$session TO ADMIN_PHANHE1;
+GRANT INHERIT PRIVILEGES ON USER SYS TO ADMIN_PHANHE1;
+GRANT INHERIT PRIVILEGES ON USER SYSTEM TO ADMIN_PHANHE1;
 
 -- Cấp quyền cứng để chạy Procedure DataPump
 GRANT CREATE TABLE TO ADMIN_PHANHE1;
@@ -254,6 +256,14 @@ BEGIN
     v_sql := 'GRANT CREATE SESSION TO C##' || v_MABN;
     EXECUTE IMMEDIATE v_sql;
 
+    -- Bước 5: Gán role RBAC cho bệnh nhân nếu role đã được cài đặt
+    BEGIN
+        v_sql := 'GRANT ROLE_BENHNHAN TO C##' || v_MABN;
+        EXECUTE IMMEDIATE v_sql;
+    EXCEPTION
+        WHEN OTHERS THEN NULL;
+    END;
+
     -- Hoàn tất toàn bộ giao dịch
     COMMIT;
 
@@ -308,6 +318,16 @@ BEGIN
     -- Bước 4: Cấp quyền kết nối cơ bản
     v_sql := 'GRANT CREATE SESSION TO C##' || v_MANV;
     EXECUTE IMMEDIATE v_sql;
+
+    -- Bước 5: Gán role RBAC cho kỹ thuật viên nếu role đã được cài đặt
+    IF REGEXP_LIKE(LOWER(p_VAITRO), 'thu.*t.*vi') THEN
+        BEGIN
+            v_sql := 'GRANT ROLE_KYTHUATVIEN TO C##' || v_MANV;
+            EXECUTE IMMEDIATE v_sql;
+        EXCEPTION
+            WHEN OTHERS THEN NULL;
+        END;
+    END IF;
 
     -- Hoàn tất toàn bộ giao dịch, lưu dữ liệu vĩnh viễn
     COMMIT;
@@ -572,6 +592,18 @@ BEGIN
         EXECUTE IMMEDIATE v_sql;
     END IF;
 
+    -- Bước 3: Cập nhật role RBAC nếu vai trò được đổi sang/ra khỏi Kỹ thuật viên
+    BEGIN
+        IF REGEXP_LIKE(LOWER(p_VAITRO), 'thu.*t.*vi') THEN
+            v_sql := 'GRANT ROLE_KYTHUATVIEN TO C##' || p_MANV;
+        ELSE
+            v_sql := 'REVOKE ROLE_KYTHUATVIEN FROM C##' || p_MANV;
+        END IF;
+        EXECUTE IMMEDIATE v_sql;
+    EXCEPTION
+        WHEN OTHERS THEN NULL;
+    END;
+
     -- Hoàn tất và lưu dữ liệu
     COMMIT;
 
@@ -747,36 +779,36 @@ END;
 -- WITH ADMIN OPTION;
 
 -- =================================================================================
--- CÁC CÂU TRUY VẤN HỖ TRỢ GIAO DIỆN (WINFORM)
+-- CÁC CÂU TRUY VẤN HỖ TRỢ GIAO DIỆN (WINFORM) - ĐÃ COMMENT ĐỂ TRÁNH POPUP BIND KHI CHẠY SCRIPT
 -- =================================================================================
 -- 1. Lấy danh sách cột của 1 bảng
-SELECT COLUMN_NAME
-FROM ALL_TAB_COLUMNS
-WHERE OWNER = 'ADMIN_PHANHE1'
-AND TABLE_NAME = UPPER(:p_table_name)
-ORDER BY COLUMN_ID;
+-- SELECT COLUMN_NAME
+-- FROM ALL_TAB_COLUMNS
+-- WHERE OWNER = 'ADMIN_PHANHE1'
+-- AND TABLE_NAME = UPPER(:p_table_name)
+-- ORDER BY COLUMN_ID;
 
 
 -- 2. Lấy danh sách TABLE
-SELECT TABLE_NAME
-FROM ALL_TABLES
-WHERE OWNER = 'ADMIN_PHANHE1'
-ORDER BY TABLE_NAME;
+-- SELECT TABLE_NAME
+-- FROM ALL_TABLES
+-- WHERE OWNER = 'ADMIN_PHANHE1'
+-- ORDER BY TABLE_NAME;
 
 
 -- 3. Lấy danh sách VIEW
-SELECT VIEW_NAME
-FROM ALL_VIEWS
-WHERE OWNER = 'ADMIN_PHANHE1'
-ORDER BY VIEW_NAME;
+-- SELECT VIEW_NAME
+-- FROM ALL_VIEWS
+-- WHERE OWNER = 'ADMIN_PHANHE1'
+-- ORDER BY VIEW_NAME;
 
 
 -- 4. Lấy danh sách PROCEDURE và FUNCTION
-SELECT OBJECT_NAME
-FROM ALL_OBJECTS
-WHERE OWNER = 'ADMIN_PHANHE1'
-AND OBJECT_TYPE IN ('PROCEDURE', 'FUNCTION')
-ORDER BY OBJECT_NAME;
+-- SELECT OBJECT_NAME
+-- FROM ALL_OBJECTS
+-- WHERE OWNER = 'ADMIN_PHANHE1'
+-- AND OBJECT_TYPE IN ('PROCEDURE', 'FUNCTION')
+-- ORDER BY OBJECT_NAME;
 
 -- =================================================================================
 -- [NHIỆM VỤ 3]: PROCEDURE
@@ -1532,3 +1564,114 @@ END;
 -- =====================================================================
 -- AUDIT (END)
 -- =====================================================================
+
+
+-- =================================================================
+-- PHAN HE 2 - TASK 1: RBAC CHO KY THUAT VIEN VA BENH NHAN
+-- =================================================================
+-- Muc tieu:
+-- 1. KTV chi xem cac dong HSBA_DV duoc phan cong cho minh va chi cap nhat KETQUA.
+-- 2. KTV va Benh nhan chi xem/sua thong tin ca nhan cua chinh minh theo cac cot duoc phep.
+-- 3. UI WinForms dang nhap bang user Oracle that va truy cap qua cac view duoc grant theo role.
+
+ALTER SESSION SET "_ORACLE_SCRIPT"=true;
+
+BEGIN
+    EXECUTE IMMEDIATE 'CREATE ROLE ROLE_KYTHUATVIEN';
+EXCEPTION
+    WHEN OTHERS THEN
+        IF SQLCODE != -1921 THEN RAISE; END IF;
+END;
+/
+
+BEGIN
+    EXECUTE IMMEDIATE 'CREATE ROLE ROLE_BENHNHAN';
+EXCEPTION
+    WHEN OTHERS THEN
+        IF SQLCODE != -1921 THEN RAISE; END IF;
+END;
+/
+
+CREATE OR REPLACE VIEW ADMIN_PHANHE1.V_RBAC_KTV_THONGTIN AS
+SELECT MANV, HOTEN, PHAI, NGAYSINH, CMND, QUEQUAN, SODT, VAITRO, CHUYENKHOA, COSO
+FROM ADMIN_PHANHE1.NHANVIEN
+WHERE 'C##' || UPPER(MANV) = SYS_CONTEXT('USERENV', 'SESSION_USER')
+WITH CHECK OPTION CONSTRAINT CK_V_RBAC_KTV_SELF;
+
+CREATE OR REPLACE VIEW ADMIN_PHANHE1.V_RBAC_KTV_DICHVU AS
+SELECT MAHSBA, LOAIDV, NGAYDV, MAKTV, KETQUA
+FROM ADMIN_PHANHE1.HSBA_DV
+WHERE 'C##' || UPPER(MAKTV) = SYS_CONTEXT('USERENV', 'SESSION_USER')
+WITH CHECK OPTION CONSTRAINT CK_V_RBAC_KTV_DICHVU;
+
+CREATE OR REPLACE VIEW ADMIN_PHANHE1.V_RBAC_BENHNHAN_THONGTIN AS
+SELECT MABN, TENBN, PHAI, NGAYSINH, CCCD, SONHA, TENDUONG, QUANHUYEN, TINHTP,
+       TIENSUBENH, TIENSUBENHGD, DIUNGTHUOC
+FROM ADMIN_PHANHE1.BENHNHAN
+WHERE 'C##' || UPPER(MABN) = SYS_CONTEXT('USERENV', 'SESSION_USER')
+WITH CHECK OPTION CONSTRAINT CK_V_RBAC_BENHNHAN_SELF;
+
+GRANT SELECT ON ADMIN_PHANHE1.V_RBAC_KTV_THONGTIN TO ROLE_KYTHUATVIEN;
+GRANT UPDATE (QUEQUAN, SODT, COSO) ON ADMIN_PHANHE1.V_RBAC_KTV_THONGTIN TO ROLE_KYTHUATVIEN;
+GRANT SELECT ON ADMIN_PHANHE1.V_RBAC_KTV_DICHVU TO ROLE_KYTHUATVIEN;
+GRANT UPDATE (KETQUA) ON ADMIN_PHANHE1.V_RBAC_KTV_DICHVU TO ROLE_KYTHUATVIEN;
+
+GRANT SELECT ON ADMIN_PHANHE1.V_RBAC_BENHNHAN_THONGTIN TO ROLE_BENHNHAN;
+GRANT UPDATE (SONHA, TENDUONG, QUANHUYEN, TINHTP, TIENSUBENH, TIENSUBENHGD, DIUNGTHUOC)
+ON ADMIN_PHANHE1.V_RBAC_BENHNHAN_THONGTIN TO ROLE_BENHNHAN;
+
+CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_SYNC_TASK1_RBAC_USERS (
+    p_DEFAULT_PASSWORD IN VARCHAR2 DEFAULT '123456'
+)
+AUTHID CURRENT_USER
+IS
+    v_sql VARCHAR2(1000);
+    v_username VARCHAR2(128);
+    v_count NUMBER;
+
+    PROCEDURE ensure_user(p_username IN VARCHAR2) IS
+        v_safe_username VARCHAR2(128);
+    BEGIN
+        v_safe_username := DBMS_ASSERT.SIMPLE_SQL_NAME(UPPER(TRIM(p_username)));
+        SELECT COUNT(*) INTO v_count FROM DBA_USERS WHERE USERNAME = v_safe_username;
+
+        IF v_count = 0 THEN
+            v_sql := 'CREATE USER ' || v_safe_username ||
+                     ' IDENTIFIED BY "' || REPLACE(p_DEFAULT_PASSWORD, '"', '""') || '"';
+            EXECUTE IMMEDIATE v_sql;
+        END IF;
+
+        EXECUTE IMMEDIATE 'GRANT CREATE SESSION TO ' || v_safe_username;
+    END;
+BEGIN
+    EXECUTE IMMEDIATE 'ALTER SESSION SET "_ORACLE_SCRIPT"=true';
+
+    FOR rec IN (SELECT MANV, VAITRO FROM ADMIN_PHANHE1.NHANVIEN)
+    LOOP
+        v_username := 'C##' || UPPER(rec.MANV);
+        ensure_user(v_username);
+
+        IF REGEXP_LIKE(LOWER(rec.VAITRO), 'thu.*t.*vi') THEN
+            EXECUTE IMMEDIATE 'GRANT ROLE_KYTHUATVIEN TO ' || DBMS_ASSERT.SIMPLE_SQL_NAME(v_username);
+        ELSE
+            BEGIN
+                EXECUTE IMMEDIATE 'REVOKE ROLE_KYTHUATVIEN FROM ' || DBMS_ASSERT.SIMPLE_SQL_NAME(v_username);
+            EXCEPTION
+                WHEN OTHERS THEN NULL;
+            END;
+        END IF;
+    END LOOP;
+
+    FOR rec IN (SELECT MABN FROM ADMIN_PHANHE1.BENHNHAN)
+    LOOP
+        v_username := 'C##' || UPPER(rec.MABN);
+        ensure_user(v_username);
+        EXECUTE IMMEDIATE 'GRANT ROLE_BENHNHAN TO ' || DBMS_ASSERT.SIMPLE_SQL_NAME(v_username);
+    END LOOP;
+END;
+/
+
+BEGIN
+    ADMIN_PHANHE1.SP_SYNC_TASK1_RBAC_USERS('123456');
+END;
+/
