@@ -28,44 +28,75 @@ namespace ADMIN
                 return;
             }
 
-            // Phân giải chuỗi kết nối dựa trên Tên đăng nhập & mật khẩu cung cấp
-            string connString = $"User Id={username};Password={password};Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=127.0.0.1)(PORT=1521))(CONNECT_DATA=(SERVER=DEDICATED)(SERVICE_NAME=orcl21)));";
+            // Hai chuỗi kết nối cho hai Service Name khác nhau
+            string connStringXepdb1 = $"User Id={username};Password={password};Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=xepdb1)));";
+            string connStringXe = $"User Id={username};Password={password};Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=xe)));";
+
+            OracleConnection conn = null;
+            string finalConnString = "";
 
             try
             {
-                // Thử kết nối với Oracle
-                using (OracleConnection conn = new OracleConnection(connString))
+                // 1. Thử kết nối với xepdb1 trước (Dành cho U1-U8 và OLS)
+                conn = new OracleConnection(connStringXepdb1);
+                conn.Open();
+                finalConnString = connStringXepdb1;
+            }
+            catch (OracleException ex) when (ex.Number == 1017 || ex.Number == 12514 || ex.Number == 1016)
+            {
+                // Nếu sai user/pass hoặc service name (ORA-01017, ORA-12514), thử kết nối với xe (Dành cho C##ADMIN, NV001, v.v.)
+                try
                 {
+                    if (conn != null) { conn.Dispose(); }
+                    conn = new OracleConnection(connStringXe);
                     conn.Open();
-                    // Lấy role và tên người dùng
-                    string role = GetUserRole(conn, username);
-                    string fullName = GetUserFullName(conn, username, role);
-
-                    // Lưu thông tin vào static properties
-                    GlobalConnectionString = connString;
-                    LoggedInUsername = username;
-                    UserRole = role;
-                    DoctorName = fullName;
-                    DoctorConnection = new OracleConnection(connString); // Tạo connection mới để sử dụng sau này
-                    DoctorConnection.Open();
-
-                    this.DialogResult = DialogResult.OK; 
-                    this.Close();
+                    finalConnString = connStringXe;
+                }
+                catch (OracleException ex2)
+                {
+                    if (conn != null) { conn.Dispose(); }
+                    if (ex2.Number == 1017 || ex2.Number == 1016)
+                    {
+                        MessageBox.Show("Sai tên đăng nhập hoặc mật khẩu!", "Lỗi Đăng Nhập", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                    else
+                    {
+                        MessageBox.Show($"Lỗi kết nối cơ sở dữ liệu ({ex2.Number}):\n{ex2.Message}", "Lỗi Hệ Thống", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                    return;
                 }
             }
             catch (OracleException ex)
             {
-                if (ex.Number == 1017) // ORA-01017: invalid username/password; logon denied
-                {
-                    MessageBox.Show("Sai tên đăng nhập hoặc mật khẩu!", "Lỗi Đăng Nhập", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
-                else
-                {
-                    MessageBox.Show($"Lỗi kết nối cơ sở dữ liệu ({ex.Number}):\n{ex.Message}", "Lỗi Hệ Thống", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
+                if (conn != null) { conn.Dispose(); }
+                MessageBox.Show($"Lỗi kết nối cơ sở dữ liệu ({ex.Number}):\n{ex.Message}", "Lỗi Hệ Thống", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
             }
             catch (Exception ex)
             {
+                if (conn != null) { conn.Dispose(); }
+                MessageBox.Show($"Lỗi Hệ Thống: {ex.Message}", "Lỗi Hệ Thống", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            // Nếu đến đây tức là conn đã Open thành công
+            try
+            {
+                string role = GetUserRole(conn, username);
+                string fullName = GetUserFullName(conn, username, role);
+
+                GlobalConnectionString = finalConnString;
+                LoggedInUsername = username;
+                UserRole = role;
+                DoctorName = fullName;
+                DoctorConnection = conn; // Giữ connection này luôn
+
+                this.DialogResult = DialogResult.OK; 
+                this.Close();
+            }
+            catch (Exception ex)
+            {
+                conn.Dispose();
                 MessageBox.Show($"Lỗi Hệ Thống: {ex.Message}", "Lỗi Hệ Thống", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -87,6 +118,13 @@ namespace ADMIN
                 if (manv.StartsWith("C##"))
                 {
                     manv = manv.Substring(3);
+                }
+
+                // Kiểm tra nếu là tài khoản OLS từ U1 đến U8
+                if (manv == "U1" || manv == "U2" || manv == "U3" || manv == "U4" ||
+                    manv == "U5" || manv == "U6" || manv == "U7" || manv == "U8")
+                {
+                    return "OLS_USER";
                 }
 
                 if (manv.Contains("ADMIN"))
@@ -140,6 +178,23 @@ namespace ADMIN
                 if (manv.StartsWith("C##"))
                 {
                     manv = manv.Substring(3);
+                }
+
+                if (manv == "U1" || manv == "U2" || manv == "U3" || manv == "U4" ||
+                    manv == "U5" || manv == "U6" || manv == "U7" || manv == "U8")
+                {
+                    switch (manv)
+                    {
+                        case "U1": return "Giám đốc U1 (Toàn viện)";
+                        case "U2": return "Lãnh đạo U2 (TM - HCM)";
+                        case "U3": return "Lãnh đạo U3 (TK - HN)";
+                        case "U4": return "Nhân viên U4 (TK - HCM)";
+                        case "U5": return "Nhân viên U5 (TM - HCM)";
+                        case "U6": return "Lãnh đạo U6 (TM - HCM)";
+                        case "U7": return "Lãnh đạo U7 (Toàn viện)";
+                        case "U8": return "Nhân viên U8 (TH - HN)";
+                        default: return username;
+                    }
                 }
 
                 string query = "SELECT HOTEN FROM ADMIN_PHANHE1.NHANVIEN WHERE MANV = :manv";
