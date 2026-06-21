@@ -1,11 +1,11 @@
 {
   "version": 2,
-  "dgSpecHash": "kUnKAr6e0jk=",
+  "dgSpecHash": "Owr38Uqy/yg=",
   "success": true,
-  "projectFilePath": "N:\\ATBMHTTT\\FixLanCUoi\\ATHTTT_QLBV\\ADMIN\\ADMIN.csproj",
+  "projectFilePath": "E:\\Desktop\\ATBM_FINAL\\ATHTTT_QLBV\\ADMIN\\ADMIN.csproj",
   "expectedPackageFiles": [
-    "C:\\Users\\NGUYEN NHAT LAN\\.nuget\\packages\\oracle.manageddataaccess.core\\23.26.200\\oracle.manageddataaccess.core.23.26.200.nupkg.sha512",
-    "C:\\Users\\NGUYEN NHAT LAN\\.nuget\\packages\\system.directoryservices.protocols\\8.0.2\\system.directoryservices.protocols.8.0.2.nupkg.sha512"
+    "C:\\Users\\Admin\\.nuget\\packages\\oracle.manageddataaccess.core\\23.26.200\\oracle.manageddataaccess.core.23.26.200.nupkg.sha512",
+    "C:\\Users\\Admin\\.nuget\\packages\\system.directoryservices.protocols\\8.0.2\\system.directoryservices.protocols.8.0.2.nupkg.sha512"
   ],
   "logs": []
 }
