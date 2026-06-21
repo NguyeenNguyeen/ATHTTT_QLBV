@@ -1,4 +1,4 @@
-# 🚀 HƯỚNG DẪN COMPILE & CHẠY
+# HƯỚNG DẪN COMPILE & CHẠY
 
 ## Bước 1: Compile Project trên Visual Studio
 
@@ -31,11 +31,10 @@
 
 1. Mở Oracle SQL Developer hoặc SQL*Plus
 2. Kết nối bằng tài khoản **SYSTEM** (hoặc DBA)
-3. Chạy các file SQL này **lần lượt**:
+3. Chạy file SQL này:
    ```
-   1. ATHTTT_QLBV/oracle/create_tables.sql
-   2. ATHTTT_QLBV/oracle/insert_data.sql
-   3. ATHTTT_QLBV/oracle/SQL_FINAL.sql
+   1. ATHTTT_QLBV/oracle/FINAL.sql
+   
    ```
 
 ### Kiểm tra Procedure đã được tạo:
@@ -54,7 +53,7 @@ Phải thấy ít nhất 10 procedure tên bắt đầu bằng `SP_`
 
 ## Bước 3: Cập Nhật Connection String (nếu cần)
 
-### Kiểm tra file Form1.cs dòng 273 (OracleHelper.AdminConnectionString):
+### Kiểm tra file Form1.cs (OracleHelper.AdminConnectionString):
 
 ```csharp
 public static readonly string AdminConnectionString = 
@@ -78,61 +77,22 @@ public static readonly string AdminConnectionString =
 
 ---
 
-## Bước 5: Test Tính Năng GRANT/REVOKE
-
-### 5.1 Test Tab GRANT
-
-```
-1. Nhấp Tab "Grant"
-2. Grantee: Chọn từ dropdown (ví: C##NV0001)
-3. Loại đối tượng: TABLE
-4. Tên đối tượng: BENHNHAN
-5. Quyền: ☑ SELECT
-6. WITH GRANT OPTION: ☐ (không check)
-7. Click "Thực thi GRANT"
-8. Nếu thành công: MessageBox sẽ hiện "Cấp quyền thành công cho C##NV0001!"
-```
-
-### 5.2 Test Tab REVOKE
-
-```
-1. Nhấp Tab "Revoke"
-2. Grantee: C##NV0001
-3. Loại đối tượng: TABLE
-4. Tên đối tượng: BENHNHAN
-5. Quyền: ☑ SELECT
-6. Click "Thực thi REVOKE"
-7. Nếu thành công: MessageBox sẽ hiện "Thu hồi quyền thành công từ C##NV0001!"
-```
-
-### 5.3 Test Tab "Thông tin quyền"
-
-```
-1. Nhấp Tab "Thông tin quyền"
-2. Loại quyền: "Xem quyền trên bảng"
-3. Mã user/Role (tuỳ chọn): C##NV0001
-4. Click "Xem quyền"
-5. DataGridView sẽ hiện danh sách quyền
-```
 
 ---
 
-## ✅ Checklist Hoàn Thành
+## Checklist Hoàn Thành
 
-- [ ] Project compile thành công (0 lỗi)
-- [ ] Oracle Database hoạt động bình thường
-- [ ] Tất cả Procedure đã được tạo
-- [ ] Application chạy mà không crash
-- [ ] Tab Grant có thể load danh sách User/Role
-- [ ] Tab Grant có thể load Object Name khi chọn Type
-- [ ] Tab Grant có thể load Column khi chọn Table
-- [ ] Có thể cấp quyền thành công
-- [ ] Có thể thu hồi quyền thành công
-- [ ] Tab "Thông tin quyền" có thể xem quyền được cấp
-
+-  Project compile thành công (0 lỗi)
+-  Oracle Database hoạt động bình thường
+-  Tất cả Procedure đã được tạo
+-  Application chạy mà không crash
+-  Có thể cấp quyền thành công
+-  Có thể thu hồi quyền thành công
+-  Có thể tạo quyền thành công
+-  Có thể xem thông tin quyền thành công
 ---
 
-## 🆘 Troubleshooting
+## Troubleshooting
 
 ### Vấn đề: "Connection timeout"
 **Giải pháp**:
@@ -165,20 +125,3 @@ public static readonly string AdminConnectionString =
 
 ---
 
-## 📚 Tài Liệu Tham Khảo
-
-- [HUONG_DAN_PHAN_QUYEN.md](HUONG_DAN_PHAN_QUYEN.md) - Chi tiết tính năng
-- [TOMA_TAT_TICH_HOP.md](TOMA_TAT_TICH_HOP.md) - Tóm tắt thay đổi
-- [test_phan_quyen.sql](oracle/test_phan_quyen.sql) - SQL test script
-
----
-
-**Nếu gặp vấn đề, kiểm tra thứ tự này**:
-1. ✅ Compile thành công?
-2. ✅ Oracle Database hoạt động?
-3. ✅ Connection String đúng?
-4. ✅ Procedure tồn tại?
-5. ✅ User C## tồn tại?
-6. ✅ Quyền DBA của ADMIN_PHANHE1?
-
-Nếu vẫn không được, cung cấp error message cho tôi để debug.

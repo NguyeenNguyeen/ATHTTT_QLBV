@@ -6,7 +6,7 @@ namespace ADMIN
     public static class OracleHelper
     {
         public static readonly string AdminConnectionString = 
-            @"User Id=ADMIN_PHANHE1;Password=Admin@123456;Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=127.0.0.1)(PORT=1521))(CONNECT_DATA=(SERVER=DEDICATED)(SERVICE_NAME=orcl21)));";
+            @"User Id=ADMIN_PHANHE1;Password=Admin@123456;Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=xepdb1)));";
 
         public static void ExecuteStoredProcedure(string procedureName, Dictionary<string, object> parameters)
         {
