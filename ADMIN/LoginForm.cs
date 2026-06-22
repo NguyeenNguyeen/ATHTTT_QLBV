@@ -29,8 +29,8 @@ namespace ADMIN
             }
 
             // Hai chuỗi kết nối cho hai Service Name khác nhau
-            string connStringXepdb1 = $"User Id={username};Password={password};Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=orclpdb1)));";
-            string connStringXe = $"User Id={username};Password={password};Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=orcl21)));";
+            string connStringXepdb1 = $"User Id={username};Password={password};Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=xepdb1)));";
+            string connStringXe = $"User Id={username};Password={password};Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=xe)));";
 
             OracleConnection conn = null;
             string finalConnString = "";
@@ -251,7 +251,7 @@ namespace ADMIN
             const string query = @"
                 SELECT ROLE
                 FROM SESSION_ROLES
-                WHERE ROLE IN ('ROLE_YSI_BACSI', 'ROLE_DIEUPHOIVIEN', 'ROLE_KYTHUATVIEN', 'ROLE_BENHNHAN')";
+                WHERE ROLE IN ('ROLE_BAC_SI', 'ROLE_DIEU_PHOI_VIEN', 'ROLE_KYTHUATVIEN', 'ROLE_BENHNHAN')";
 
             using (OracleCommand cmd = new OracleCommand(query, conn))
             using (OracleDataReader reader = cmd.ExecuteReader())
@@ -259,9 +259,9 @@ namespace ADMIN
                 while (reader.Read())
                 {
                     string role = reader.GetString(0);
-                    if (role == "ROLE_YSI_BACSI")
+                    if (role == "ROLE_BAC_SI")
                         return "DOCTOR";
-                    if (role == "ROLE_DIEUPHOIVIEN")
+                    if (role == "ROLE_DIEU_PHOI_VIEN")
                         return "DISPATCHER";
                     if (role == "ROLE_KYTHUATVIEN")
                         return "TECHNICIAN";
