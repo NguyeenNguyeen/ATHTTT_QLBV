@@ -4,17 +4,17 @@ ALTER SESSION SET CURRENT_SCHEMA = SYS; -- SYS.V_$SESSION
 ALTER SESSION SET "_ORACLE_SCRIPT"=true; 
 
 -- XOÁ THIẾT LẬP FLASHBACK LÊN CÁC BẢNG ĐƯỢC AUDIT -> ĐỂ CÓ THỂ XOÁ ĐƯỢC USER ADMIN
-ALTER TABLE ADMIN_PHANHE1.HSBA NO FLASHBACK ARCHIVE;
-ALTER TABLE ADMIN_PHANHE1.HSBA_DV NO FLASHBACK ARCHIVE;
-ALTER TABLE ADMIN_PHANHE1.DONTHUOC NO FLASHBACK ARCHIVE;
-
-DROP FLASHBACK ARCHIVE fda_phanhe1;
-
-
-DROP USER ADMIN_PHANHE1 CASCADE;
+BEGIN
+    BEGIN EXECUTE IMMEDIATE 'ALTER TABLE ADMIN_PHANHE1.HSBA NO FLASHBACK ARCHIVE'; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN EXECUTE IMMEDIATE 'ALTER TABLE ADMIN_PHANHE1.HSBA_DV NO FLASHBACK ARCHIVE'; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN EXECUTE IMMEDIATE 'ALTER TABLE ADMIN_PHANHE1.DONTHUOC NO FLASHBACK ARCHIVE'; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN EXECUTE IMMEDIATE 'DROP FLASHBACK ARCHIVE fda_phanhe1'; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN EXECUTE IMMEDIATE 'DROP FLASHBACK ARCHIVE FBA_BV_NEW'; EXCEPTION WHEN OTHERS THEN NULL; END;
+END;
 /
 
-
+BEGIN EXECUTE IMMEDIATE 'DROP USER ADMIN_PHANHE1 CASCADE'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
 
 -- Tạo user dùng chung cho cả nhóm
 CREATE USER ADMIN_PHANHE1 IDENTIFIED BY "Admin@123456" DEFAULT TABLESPACE USERS;
@@ -31,14 +31,15 @@ GRANT INHERIT PRIVILEGES ON USER SYSTEM TO ADMIN_PHANHE1;
 -- Cấp quyền cứng để chạy Procedure DataPump
 GRANT CREATE TABLE TO ADMIN_PHANHE1;
 GRANT CREATE JOB TO ADMIN_PHANHE1;
-GRANT READ, WRITE ON DIRECTORY BACKUP_DIR TO ADMIN_PHANHE1;
+-- Đã thêm bẫy lỗi để né lỗi nếu Directory chưa được tạo
+BEGIN EXECUTE IMMEDIATE 'GRANT READ, WRITE ON DIRECTORY BACKUP_DIR TO ADMIN_PHANHE1'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
 GRANT DATAPUMP_EXP_FULL_DATABASE TO ADMIN_PHANHE1;
 GRANT DATAPUMP_IMP_FULL_DATABASE TO ADMIN_PHANHE1;
 
 
 ALTER SESSION SET "_ORACLE_SCRIPT"=false;
 ALTER SESSION SET CURRENT_SCHEMA = ADMIN_PHANHE1;
-
 
 
 -- ==========================================
@@ -81,14 +82,6 @@ CREATE TABLE BENHNHAN (
     DIUNGTHUOC NVARCHAR2(1000)
 );
 
--- Bảng THÔNG BÁO (Độc lập, dùng cho OLS)
-CREATE TABLE THONG_BAO (
-    MATB VARCHAR2(20) PRIMARY KEY,
-    NOIDUNG NVARCHAR2(1000),
-    NGAYGIO TIMESTAMP,
-    DIADIEM NVARCHAR2(100),
-    OLS_LABEL NUMBER(10) -- Cột lưu mã số của nhãn OLS
-);
 
 
 -- ==========================================
@@ -186,10 +179,6 @@ INSERT INTO HSBA_DV VALUES ('HS000003', N'Nội soi dạ dày', TO_DATE('12-04-2
 INSERT INTO DONTHUOC VALUES ('HS000001', N'Concor 5mg', TO_DATE('10-04-26', 'DD-MM-YY'), N'Ngày 1 viên, uống buổi sáng sau ăn');
 INSERT INTO DONTHUOC VALUES ('HS000002', N'Paracetamol 500mg', TO_DATE('11-04-26', 'DD-MM-YY'), N'Ngày 2 viên, sáng/tối khi đau đầu');
 INSERT INTO DONTHUOC VALUES ('HS000003', N'Omeprazole 20mg', TO_DATE('12-04-26', 'DD-MM-YY'), N'Ngày 1 viên, uống trước khi ăn sáng 30 phút');
-
--- THONG_BAO (Dành cho OLS - Hiện tại để trống nhãn OLS_LABEL chờ Phân hệ 2)
-INSERT INTO THONG_BAO VALUES ('TB001', N'Họp giao ban toàn viện tháng 4', TO_TIMESTAMP('20-04-26 08:00:00', 'DD-MM-YY HH24:MI:SS'), N'Hội trường A', NULL);
-INSERT INTO THONG_BAO VALUES ('TB002', N'Họp khẩn Ban Lãnh đạo Khoa Tim mạch', TO_TIMESTAMP('21-04-26 14:00:00', 'DD-MM-YY HH24:MI:SS'), N'Phòng họp 1 - Cơ sở HCM', NULL);
 
 COMMIT;
 
@@ -552,10 +541,7 @@ END;
 /
 
 -- Cập nhật thông tin Nhân viên
--- Lệnh xóa (Nếu chưa có sẽ báo lỗi ORA-04043, bạn cứ bỏ qua không sao nhé)
-DROP PROCEDURE ADMIN_PHANHE1.SP_SUA_NHANVIEN;
-
--- Lệnh tạo mới
+-- Lệnh tạo mới (Bỏ DROP cũ đi để an toàn ghi đè)
 CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_SUA_NHANVIEN (
     p_MANV IN VARCHAR2, -- Mã NV dùng để xác định người cần sửa
     p_HOTEN IN NVARCHAR2,
@@ -618,9 +604,6 @@ END;
 
 -- Xem quyền trên toàn bộ nhân viên
 GRANT SELECT ANY DICTIONARY TO ADMIN_PHANHE1;
-
--- Lệnh xóa (Chỉ chạy khi Procedure đã tồn tại, nếu không sẽ báo lỗi ORA-04043)
-DROP PROCEDURE ADMIN_PHANHE1.SP_XEM_QUYEN_ALL_USER;
 
 -- Lệnh tạo mới (hoặc ghi đè)
 CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_XEM_QUYEN_ALL_USER (
@@ -716,101 +699,6 @@ END;
 -- =================================================================================
 
 -- =================================================================================
--- 3.1 CẤP QUYỀN TRÊN BẢNG (TABLE) / VIEW
--- =================================================================================
-
--- -- Cấp quyền trên toàn bộ bảng hoặc view
--- GRANT <PRIVILEGE> 
--- ON ADMIN_PHANHE1.<OBJECT_NAME> 
--- TO <GRANTEE>;
-
--- -- Trong đó:
--- -- <PRIVILEGE>: SELECT | INSERT | UPDATE | DELETE
--- -- <OBJECT_NAME>: tên bảng hoặc view
--- -- <GRANTEE>: USER hoặc ROLE
-
--- -- Cấp quyền kèm WITH GRANT OPTION (chỉ áp dụng cho USER)
--- GRANT <PRIVILEGE> 
--- ON ADMIN_PHANHE1.<OBJECT_NAME> 
--- TO <USERNAME> 
--- WITH GRANT OPTION;
-
-
--- -- =================================================================================
--- -- 3.2 CẤP QUYỀN TRÊN CỘT (COLUMN-LEVEL)
--- -- =================================================================================
-
--- -- Chỉ áp dụng cho SELECT và UPDATE
-
--- -- Cấp quyền SELECT trên các cột cụ thể
--- GRANT SELECT (<COLUMN_1>, <COLUMN_2>) 
--- ON ADMIN_PHANHE1.<TABLE_NAME> 
--- TO <GRANTEE>;
-
--- -- Cấp quyền UPDATE trên các cột cụ thể
--- GRANT UPDATE (<COLUMN_1>, <COLUMN_2>) 
--- ON ADMIN_PHANHE1.<TABLE_NAME> 
--- TO <GRANTEE>;
-
-
--- -- =================================================================================
--- -- 3.3 CẤP QUYỀN TRÊN PROCEDURE / FUNCTION
--- -- =================================================================================
-
--- -- Chỉ sử dụng quyền EXECUTE
--- GRANT EXECUTE 
--- ON ADMIN_PHANHE1.<PROGRAM_NAME> 
--- TO <GRANTEE>;
-
--- -- <PROGRAM_NAME>: tên PROCEDURE hoặc FUNCTION
-
-
--- -- =================================================================================
--- -- 3.4 CẤP ROLE CHO USER
--- -- =================================================================================
-
--- -- Gán ROLE cho USER
--- GRANT <ROLE_NAME> 
--- TO <USERNAME>;
-
--- -- Gán ROLE kèm quyền quản trị (ADMIN OPTION)
--- GRANT <ROLE_NAME> 
--- TO <USERNAME> 
--- WITH ADMIN OPTION;
-
--- =================================================================================
--- CÁC CÂU TRUY VẤN HỖ TRỢ GIAO DIỆN (WINFORM) - ĐÃ COMMENT ĐỂ TRÁNH POPUP BIND KHI CHẠY SCRIPT
--- =================================================================================
--- 1. Lấy danh sách cột của 1 bảng
--- SELECT COLUMN_NAME
--- FROM ALL_TAB_COLUMNS
--- WHERE OWNER = 'ADMIN_PHANHE1'
--- AND TABLE_NAME = UPPER(:p_table_name)
--- ORDER BY COLUMN_ID;
-
-
--- 2. Lấy danh sách TABLE
--- SELECT TABLE_NAME
--- FROM ALL_TABLES
--- WHERE OWNER = 'ADMIN_PHANHE1'
--- ORDER BY TABLE_NAME;
-
-
--- 3. Lấy danh sách VIEW
--- SELECT VIEW_NAME
--- FROM ALL_VIEWS
--- WHERE OWNER = 'ADMIN_PHANHE1'
--- ORDER BY VIEW_NAME;
-
-
--- 4. Lấy danh sách PROCEDURE và FUNCTION
--- SELECT OBJECT_NAME
--- FROM ALL_OBJECTS
--- WHERE OWNER = 'ADMIN_PHANHE1'
--- AND OBJECT_TYPE IN ('PROCEDURE', 'FUNCTION')
--- ORDER BY OBJECT_NAME;
-
--- =================================================================================
 -- [NHIỆM VỤ 3]: PROCEDURE
 -- =================================================================================
 -- PROCEDURE cấp mọi loại quyền ---
@@ -857,9 +745,6 @@ BEGIN
     
     -- Thực thi câu lệnh
     EXECUTE IMMEDIATE v_sql;
-    
-    -- Lưu ý: Lệnh GRANT thường không cần COMMIT vì nó là DDL (Data Definition Language)
-    -- Nhưng nếu bạn muốn giữ COMMIT để đảm bảo tính nhất quán trong logic riêng thì có thể để lại.
     COMMIT;
 
 EXCEPTION
@@ -901,8 +786,6 @@ END;
 /
 
 -- lấy danh sách view
--- Lệnh xóa nếu đã tồn tại
-
 CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_GET_LIST_VIEWS (
     p_CURSOR OUT SYS_REFCURSOR
 )
@@ -918,9 +801,6 @@ BEGIN
 END;
 /
 -- lấy danh sách procedure / function
--- Lệnh xóa nếu đã tồn tại
-
--- Lệnh tạo mới
 CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_GET_LIST_PROCS_FUNCS (
     p_CURSOR OUT SYS_REFCURSOR
 )
@@ -1064,9 +944,13 @@ END;
 -- =================================================================
 
 -- THAY ĐÔI THÀNH ĐƯỜNG DẪN THÍCH HỢP TRONG WINDOW: 1 THƯ MỤC ĐỂ LƯU CÁC FILE BACKUP CD: C:\Backup_Oracle
-CREATE OR REPLACE DIRECTORY BACKUP_DIR AS '/backup'; 
-GRANT READ, WRITE ON DIRECTORY BACKUP_DIR TO system;
-GRANT READ, WRITE ON DIRECTORY BACKUP_DIR TO ADMIN_PHANHE1;
+-- Bẫy lỗi Directory để tránh nghẽn script
+BEGIN EXECUTE IMMEDIATE 'CREATE OR REPLACE DIRECTORY BACKUP_DIR AS ''/backup'''; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+BEGIN EXECUTE IMMEDIATE 'GRANT READ, WRITE ON DIRECTORY BACKUP_DIR TO system'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+BEGIN EXECUTE IMMEDIATE 'GRANT READ, WRITE ON DIRECTORY BACKUP_DIR TO ADMIN_PHANHE1'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
 
 -- =================================================================
 -- BACKUP && RESTORE: DATA PUMP
@@ -1215,18 +1099,25 @@ END;
 
 -- CẤP CÁC QUYỀN CẦN THIẾT ĐỂ BACKUP VÀ RESTORE
 -- TẠO VÀ CẤP QUYỀN ĐỂ DÙNG FLASHBACK RESTORE
--- 1. Tao mot kho luu tru ngam ten la FDA_PHANHE1, dung luong toi da 1GB, luu lich su 1 nam
-CREATE FLASHBACK ARCHIVE fda_phanhe1 TABLESPACE USERS QUOTA 1G RETENTION 1 YEAR;
+-- 1. Tao mot kho luu tru ngam ten la FBA_BV_NEW, dung luong toi da 100M, luu lich su 1 nam
+BEGIN EXECUTE IMMEDIATE 'CREATE FLASHBACK ARCHIVE FBA_BV_NEW TABLESPACE USERS QUOTA 100M RETENTION 1 YEAR'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+
 -- 2. Cap quyen cho user do an duoc su dung kho luu tru nay
-GRANT FLASHBACK ARCHIVE ON fda_phanhe1 TO ADMIN_PHANHE1;
+GRANT FLASHBACK ARCHIVE ON FBA_BV_NEW TO ADMIN_PHANHE1;
+
 -- 3. Bat che do "Di chuyen dong" (Bat buoc de Flashback hoat dong)
 ALTER TABLE ADMIN_PHANHE1.HSBA ENABLE ROW MOVEMENT;
 ALTER TABLE ADMIN_PHANHE1.HSBA_DV ENABLE ROW MOVEMENT;
 ALTER TABLE ADMIN_PHANHE1.DONTHUOC ENABLE ROW MOVEMENT;
--- 4. Gan kho luu tru FDA vao cac bang de Oracle bat dau ghi log lich su vinh vien
-ALTER TABLE ADMIN_PHANHE1.HSBA FLASHBACK ARCHIVE fda_phanhe1;
-ALTER TABLE ADMIN_PHANHE1.HSBA_DV FLASHBACK ARCHIVE fda_phanhe1;
-ALTER TABLE ADMIN_PHANHE1.DONTHUOC FLASHBACK ARCHIVE fda_phanhe1;
+
+-- 4. Gan kho luu tru FBA vao cac bang de Oracle bat dau ghi log lich su vinh vien
+BEGIN EXECUTE IMMEDIATE 'ALTER TABLE ADMIN_PHANHE1.HSBA FLASHBACK ARCHIVE FBA_BV_NEW'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+BEGIN EXECUTE IMMEDIATE 'ALTER TABLE ADMIN_PHANHE1.HSBA_DV FLASHBACK ARCHIVE FBA_BV_NEW'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+BEGIN EXECUTE IMMEDIATE 'ALTER TABLE ADMIN_PHANHE1.DONTHUOC FLASHBACK ARCHIVE FBA_BV_NEW'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
 
 
 CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_RESTORE_FLASHBACK (
@@ -1258,12 +1149,6 @@ END SP_RESTORE_FLASHBACK;
 -- =================================================================
 -- BACKUP && RESTORE (END)
 -- =================================================================
-
--- =====================================================================
--- VDP (START)
--- =====================================================================
-/*  PHÂN HỆ 2
-*/
 -- ============================================================
 -- BƯỚC 0: XÓA POLICY CŨ (chạy trước để tránh lỗi khi tạo lại)
 -- ============================================================
@@ -1659,18 +1544,11 @@ END;
 
 
 
+
+
 -- =====================================================================
 -- AUDIT (START)
 -- =====================================================================
-
-SELECT object_name,
-       policy_name,
-       enabled,
-       policy_text
-FROM dba_audit_policies
-WHERE object_name = 'HSBA_DV';
-
-
 
 GRANT SELECT ON SYS.DBA_AUDIT_TRAIL TO ADMIN_PHANHE1;
 GRANT SELECT ON SYS.DBA_FGA_AUDIT_TRAIL TO ADMIN_PHANHE1;
@@ -1741,14 +1619,9 @@ ORDER BY RAW_TIME DESC;
 -- CÀI ĐẶT TÌNH HUỐNG STANDARD AUDIT
 -- =====================================================================
 
--- xem cấu hình audit hiện tại có DB_EXTENDED chưa, chưa thì đổi bằng dòng ALTER bên dưới
-SHOW PARAMETER audit_trail;
-
--- Nếu audit_trail chưa được bật hoặc không phải là DB hoặc DB, EXTENDED thì cần bật bằng câu lệnh sau:
-ALTER SYSTEM SET audit_trail = DB, EXTENDED SCOPE = SPFILE;
--- Cần tắt và khởi động lại database để thay đổi có hiệu lực:
--- SHUTDOWN IMMEDIATE;
--- STARTUP;
+-- Lệnh này gây lỗi ORA-65040 nếu chạy trong PDB nên được comment.
+-- Nếu hệ thống chưa bật Audit thì bắt buộc phải chạy ở CDB$ROOT
+-- ALTER SYSTEM SET audit_trail = DB, EXTENDED SCOPE = SPFILE;
 
 -- =====================================================================
 -- NGỮ CẢNH 1: Giám sát Hệ thống - Đăng nhập thất bại (Session)
@@ -1765,24 +1638,16 @@ AUDIT INSERT, UPDATE, DELETE ON ADMIN_PHANHE1.HSBA BY ACCESS;
 
 -- =====================================================================
 -- NGỮ CẢNH 3: Giám sát View - Truy xuất dữ liệu nhạy cảm
--- Ý nghĩa: Giám sát hành vi truy vấn (SELECT) trên View hồ sơ bệnh án 
--- (Giả sử bạn có 1 view tên là V_HSBA_BACSI để bác sĩ xem hồ sơ).
--- Ghi log mỗi khi có người đọc dữ liệu này.
 -- =====================================================================
--- Lưu ý: Đổi 'V_HSBA_BACSI' thành tên View thực tế của nhóm.
 AUDIT SELECT ON V_ALL_AUDIT_LOG BY ACCESS;
 
 -- =====================================================================
 -- NGỮ CẢNH 4: Giám sát Stored Procedure
--- Ý nghĩa: Giám sát việc thực thi các thủ tục có tính rủi ro cao. 
--- Ví dụ: Giám sát xem ai đã chạy thủ tục tạo hồ sơ bệnh án mới.
 -- =====================================================================
--- Lưu ý: Đổi 'SP_TAO_HSBA' thành tên Procedure thực tế của nhóm.
 AUDIT EXECUTE ON ADMIN_PHANHE1.SP_RESTORE_FLASHBACK BY ACCESS;
 
 -- =====================================================================
 -- NGỮ CẢNH 5: Giám sát Cấu trúc (DDL) - Bảo vệ Schema
--- Ý nghĩa: Phát hiện các hành vi cố tình thay đổi cấu trúc bảng (CREATE, ALTER, DROP, TRUNCATE) 
 -- =====================================================================
 AUDIT TABLE BY ACCESS;
 
@@ -2076,10 +1941,10 @@ END;
 -- PHAN HE 2 - TASK OLS: OBJECT-LEVEL SECURITY DE PHAT TAN THONG BAO
 -- =================================================================
 -- 0. Cấu hình OLS (Chỉ cần làm 1 lần duy nhất, không cần lặp lại nếu đã làm rồi)
-EXEC LBACSYS.CONFIGURE_OLS;
-EXEC LBACSYS.OLS_ENFORCEMENT.ENABLE_OLS;
-SHUTDOWN IMMEDIATE;
-STARTUP;
+-- EXEC LBACSYS.CONFIGURE_OLS;
+-- EXEC LBACSYS.OLS_ENFORCEMENT.ENABLE_OLS;
+-- SHUTDOWN IMMEDIATE;
+-- STARTUP;
 -- Hoặc có thể tắt SQL*Plus và khởi động lại database bằng tay để áp dụng cấu hình OLS mới
 -- 1. Đảm bảo đứng đúng Pluggable Database cục bộ
 ALTER SESSION SET CONTAINER = XEPDB1;
@@ -2111,8 +1976,6 @@ BEGIN
         END LOOP;
         BEGIN EXECUTE IMMEDIATE 'DROP USER U' || i || ' CASCADE'; EXCEPTION WHEN OTHERS THEN NULL; END;
     END LOOP;
-    BEGIN EXECUTE IMMEDIATE 'DROP TABLE ADMIN_PHANHE1.THONGBAO CASCADE CONSTRAINTS'; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN EXECUTE IMMEDIATE 'DROP USER ADMIN_PHANHE1 CASCADE'; EXCEPTION WHEN OTHERS THEN NULL; END;
 END;
 /
 
@@ -2121,28 +1984,37 @@ END;
 -- =====================================================================
 ALTER SESSION SET "_ORACLE_SCRIPT" = false;
 
-CREATE USER ADMIN_PHANHE1 IDENTIFIED BY "Admin@123456" DEFAULT TABLESPACE USERS;
 ALTER USER ADMIN_PHANHE1 QUOTA UNLIMITED ON USERS;
 GRANT DBA TO ADMIN_PHANHE1;
 
 BEGIN
     FOR i IN 1..8 LOOP
-        EXECUTE IMMEDIATE 'CREATE USER U' || i || ' IDENTIFIED BY "User@123"';
-        EXECUTE IMMEDIATE 'GRANT CREATE SESSION TO U' || i;
+        DECLARE
+            v_count NUMBER;
+        BEGIN
+            -- Kiểm tra xem User U1, U2... đã tồn tại hay chưa
+            SELECT COUNT(*) INTO v_count FROM dba_users WHERE username = 'U' || i;
+            
+            IF v_count = 0 THEN
+                -- Nếu chưa có thì tạo mới
+                EXECUTE IMMEDIATE 'CREATE USER U' || i || ' IDENTIFIED BY "User@123"';
+            ELSE
+                -- Nếu lỡ bị kẹt do lần chạy trước, chỉ cần cập nhật lại mật khẩu
+                EXECUTE IMMEDIATE 'ALTER USER U' || i || ' IDENTIFIED BY "User@123"';
+            END IF;
+            
+            -- Cấp quyền đăng nhập
+            EXECUTE IMMEDIATE 'GRANT CREATE SESSION TO U' || i;
+        END;
     END LOOP;
 END;
 /
-
--- =====================================================================
--- BƯỚC 1: TẠO BẢNG LOCAL VÀ CHÈN DỮ LIỆU CŨ
--- =====================================================================
 CREATE TABLE ADMIN_PHANHE1.THONGBAO (
     MATB VARCHAR2(20) PRIMARY KEY,
     NOIDUNG NVARCHAR2(1000),
     NGAYGIO TIMESTAMP,
     DIADIEM NVARCHAR2(100)
 );
-
 GRANT SELECT ON ADMIN_PHANHE1.THONGBAO TO U1, U2, U3, U4, U5, U6, U7, U8;
 
 INSERT INTO ADMIN_PHANHE1.THONGBAO VALUES ('t1', N'Đây là thông báo gửi đến toàn bộ nhân viên', SYSTIMESTAMP, N'Hội trường A');
@@ -2153,7 +2025,6 @@ INSERT INTO ADMIN_PHANHE1.THONGBAO VALUES ('t5', N'Đây là thông báo gửi �
 INSERT INTO ADMIN_PHANHE1.THONGBAO VALUES ('t6', N'Đây là thông báo gửi đến nhân viên Khoa tiêu hóa ở Hà Nội', SYSTIMESTAMP, N'Cơ sở HN');
 INSERT INTO ADMIN_PHANHE1.THONGBAO VALUES ('t7', N'Đây là thông báo gửi đến lãnh đạo Khoa tiêu hóa và Khoa thần kinh tại Hải Phòng', SYSTIMESTAMP, N'Cơ sở HP');
 COMMIT;
-
 -- =====================================================================
 -- BƯỚC 2: TẠO POLICY VÀ THÀNH PHẦN OLS
 -- =====================================================================
@@ -2223,28 +2094,17 @@ EXEC SA_USER_ADMIN.SET_GROUPS('OLS_BV', 'U6', 'HCM', 'HCM', 'HCM', 'HCM');
 EXEC SA_USER_ADMIN.SET_LEVELS('OLS_BV', 'U7', 'LD', 'NV', 'LD', 'LD');
 EXEC SA_USER_ADMIN.SET_COMPARTMENTS('OLS_BV', 'U7', 'TH,TK,TM', 'TH,TK,TM', 'TH,TK,TM', 'TH,TK,TM');
 EXEC SA_USER_ADMIN.SET_GROUPS('OLS_BV', 'U7', 'TOAN_VIEN', 'TOAN_VIEN', 'TOAN_VIEN', 'TOAN_VIEN');
+
 -- U8: Nhân viên thuộc Khoa Tiêu hóa tại Hà Nội
 EXEC SA_USER_ADMIN.SET_LEVELS('OLS_BV', 'U8', 'NV', 'NV', 'NV', 'NV');
 EXEC SA_USER_ADMIN.SET_COMPARTMENTS('OLS_BV', 'U8', 'TH', 'TH', 'TH', 'TH');
 EXEC SA_USER_ADMIN.SET_GROUPS('OLS_BV', 'U8', 'HN', 'HN', 'HN', 'HN');
 
--- =====================================================================
--- BƯỚC 5: ÁP DỤNG CHÍNH SÁCH ĐỆM NO_CONTROL (SỬA LỖI ORA-00904 CỐT LÕI)
--- =====================================================================
--- Phải chạy lệnh này trước để Oracle tạo cột ẩn OLS_LABEL vào bảng
 BEGIN
-    SA_POLICY_ADMIN.APPLY_TABLE_POLICY(
-        policy_name    => 'OLS_BV',
-        schema_name    => 'ADMIN_PHANHE1',
-        table_name     => 'THONGBAO',
-        table_options  => 'NO_CONTROL'
-    );
+    SA_POLICY_ADMIN.APPLY_TABLE_POLICY('OLS_BV', 'ADMIN_PHANHE1', 'THONGBAO', 'NO_CONTROL');
 END;
 /
 
--- =====================================================================
--- BƯỚC 6: CẬP NHẬT NHÃN DỮ LIỆU CŨ (Chạy mượt mà vì cột đã tồn tại)
--- =====================================================================
 UPDATE ADMIN_PHANHE1.THONGBAO SET OLS_LABEL = CHAR_TO_LABEL('OLS_BV', 'NV') WHERE MATB = 't1';
 UPDATE ADMIN_PHANHE1.THONGBAO SET OLS_LABEL = CHAR_TO_LABEL('OLS_BV', 'GD') WHERE MATB = 't2';
 UPDATE ADMIN_PHANHE1.THONGBAO SET OLS_LABEL = CHAR_TO_LABEL('OLS_BV', 'LD') WHERE MATB = 't3';
@@ -2253,21 +2113,9 @@ UPDATE ADMIN_PHANHE1.THONGBAO SET OLS_LABEL = CHAR_TO_LABEL('OLS_BV', 'NV:TH:HCM
 UPDATE ADMIN_PHANHE1.THONGBAO SET OLS_LABEL = CHAR_TO_LABEL('OLS_BV', 'NV:TH:HN') WHERE MATB = 't6';
 UPDATE ADMIN_PHANHE1.THONGBAO SET OLS_LABEL = CHAR_TO_LABEL('OLS_BV', 'LD:TH,TK:HP') WHERE MATB = 't7';
 COMMIT;
-
--- =====================================================================
--- BƯỚC 7: NÂNG CẤP LÊN HÀNG RÀO KIỂM SOÁT TOÀN DIỆN (FULL ENFORCEMENT)
--- =====================================================================
-EXEC SA_POLICY_ADMIN.REMOVE_TABLE_POLICY('OLS_BV', 'ADMIN_PHANHE1', 'THONGBAO');
-
 BEGIN
-    SA_POLICY_ADMIN.APPLY_TABLE_POLICY(
-        policy_name    => 'OLS_BV',
-        schema_name    => 'ADMIN_PHANHE1',
-        table_name     => 'THONGBAO',
-        table_options  => 'READ_CONTROL,WRITE_CONTROL,CHECK_CONTROL'
-    );
+    SA_POLICY_ADMIN.REMOVE_TABLE_POLICY('OLS_BV', 'ADMIN_PHANHE1', 'THONGBAO');
+    SA_POLICY_ADMIN.APPLY_TABLE_POLICY('OLS_BV', 'ADMIN_PHANHE1', 'THONGBAO', 'READ_CONTROL,WRITE_CONTROL,CHECK_CONTROL');
+    SA_POLICY_ADMIN.ENABLE_TABLE_POLICY('OLS_BV', 'ADMIN_PHANHE1', 'THONGBAO');
 END;
 /
-
--- Kích hoạt đồng bộ hóa bộ nhớ đệm chính sách
-EXEC SA_POLICY_ADMIN.ENABLE_TABLE_POLICY('OLS_BV', 'ADMIN_PHANHE1', 'THONGBAO');
