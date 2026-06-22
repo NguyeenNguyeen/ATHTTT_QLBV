@@ -1259,7 +1259,403 @@ END SP_RESTORE_FLASHBACK;
 -- BACKUP && RESTORE (END)
 -- =================================================================
 
+-- =====================================================================
+-- VDP (START)
+-- =====================================================================
+/*  PHÂN HỆ 2
+*/
+-- ============================================================
+-- BƯỚC 0: XÓA POLICY CŨ (chạy trước để tránh lỗi khi tạo lại)
+-- ============================================================
 
+
+
+-- ============================================================
+-- BƯỚC 1: SỬA GRANT (bổ sung SELECT còn thiếu)
+-- ============================================================
+ALTER SESSION SET "_ORACLE_SCRIPT" = true;
+CREATE ROLE ROLE_DIEU_PHOI_VIEN;
+CREATE ROLE ROLE_BAC_SI;
+ALTER SESSION SET "_ORACLE_SCRIPT" = false;
+
+GRANT SELECT, INSERT, UPDATE ON ADMIN_PHANHE1.BENHNHAN  TO ROLE_DIEU_PHOI_VIEN;
+GRANT SELECT, INSERT         ON ADMIN_PHANHE1.HSBA       TO ROLE_DIEU_PHOI_VIEN;
+GRANT UPDATE (MAKHOA, MABS)  ON ADMIN_PHANHE1.HSBA       TO ROLE_DIEU_PHOI_VIEN;
+GRANT SELECT                 ON ADMIN_PHANHE1.HSBA_DV    TO ROLE_DIEU_PHOI_VIEN; -- bổ sung
+GRANT UPDATE (MAKTV)         ON ADMIN_PHANHE1.HSBA_DV    TO ROLE_DIEU_PHOI_VIEN;
+GRANT SELECT                 ON ADMIN_PHANHE1.NHANVIEN TO ROLE_DIEU_PHOI_VIEN;
+
+
+GRANT SELECT                              ON ADMIN_PHANHE1.HSBA      TO ROLE_BAC_SI;
+GRANT UPDATE (CHANDOAN, DIEUTRI, KETLUAN) ON ADMIN_PHANHE1.HSBA      TO ROLE_BAC_SI;
+GRANT SELECT, INSERT, DELETE              ON ADMIN_PHANHE1.HSBA_DV   TO ROLE_BAC_SI;
+GRANT SELECT                              ON ADMIN_PHANHE1.BENHNHAN  TO ROLE_BAC_SI;
+GRANT UPDATE (TIENSUBENH, TIENSUBENHGD, DIUNGTHUOC) ON ADMIN_PHANHE1.BENHNHAN TO ROLE_BAC_SI;
+GRANT SELECT, INSERT, UPDATE, DELETE      ON ADMIN_PHANHE1.DONTHUOC  TO ROLE_BAC_SI;
+
+-- ============================================================
+-- BƯỚC 2: HÀM VPD GỘP — 1 hàm cho mỗi bảng, xử lý cả 2 vai trò
+-- ============================================================
+
+-- Bảng HSBA
+CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_VPD_HSBA (
+    p_schema IN VARCHAR2,
+    p_table  IN VARCHAR2
+) RETURN VARCHAR2
+AS
+    v_session_user VARCHAR2(128);
+    v_manv   VARCHAR2(20);
+    v_vaitro NVARCHAR2(50);
+BEGIN
+    v_session_user := SYS_CONTEXT('USERENV', 'SESSION_USER');
+
+    IF v_session_user IN ('ADMIN_PHANHE1', 'SYS', 'SYSTEM') THEN
+        RETURN '1=1';
+    END IF;
+
+    IF v_session_user NOT LIKE 'C##%' THEN
+        RETURN '1=2';
+    END IF;
+
+    v_manv := SUBSTR(v_session_user, 4);
+
+    SELECT VAITRO INTO v_vaitro
+    FROM ADMIN_PHANHE1.NHANVIEN
+    WHERE MANV = v_manv;
+
+    IF v_vaitro = N'Bác sĩ/Y sĩ' THEN
+        -- Bác sĩ chỉ thấy HSBA mình phụ trách
+        RETURN 'MABS = ''' || v_manv || '''';
+    END IF;
+
+    IF v_vaitro = N'Điều phối viên' THEN
+        -- Điều phối viên thấy tất cả HSBA
+        RETURN '1=1';
+    END IF;
+
+    -- Vai trò khác không liên quan policy này
+    RETURN '1=2';
+
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN RETURN '1=2';
+END;
+/
+
+-- Bảng BENHNHAN
+CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_VPD_BENHNHAN (
+    p_schema IN VARCHAR2,
+    p_table  IN VARCHAR2
+) RETURN VARCHAR2
+AS
+    v_session_user VARCHAR2(128);
+    v_manv   VARCHAR2(20);
+    v_vaitro NVARCHAR2(50);
+BEGIN
+    v_session_user := SYS_CONTEXT('USERENV', 'SESSION_USER');
+
+    IF v_session_user IN ('ADMIN_PHANHE1', 'SYS', 'SYSTEM') THEN
+        RETURN '1=1';
+    END IF;
+
+    IF v_session_user NOT LIKE 'C##%' THEN
+        RETURN '1=2';
+    END IF;
+
+    v_manv := SUBSTR(v_session_user, 4);
+
+    SELECT VAITRO INTO v_vaitro
+    FROM ADMIN_PHANHE1.NHANVIEN
+    WHERE MANV = v_manv;
+
+    IF v_vaitro = N'Bác sĩ/Y sĩ' THEN
+        -- Bác sĩ chỉ thấy BN thuộc HSBA mình điều trị
+        RETURN 'MABN IN (SELECT MABN FROM ADMIN_PHANHE1.HSBA WHERE MABS = ''' || v_manv || ''')';
+    END IF;
+
+    IF v_vaitro = N'Điều phối viên' THEN
+        -- Điều phối viên thấy tất cả bệnh nhân
+        RETURN '1=1';
+    END IF;
+
+    RETURN '1=2';
+
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN RETURN '1=2';
+END;
+/
+
+-- Bảng HSBA_DV
+CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_VPD_HSBA_DV (
+    p_schema IN VARCHAR2,
+    p_table  IN VARCHAR2
+) RETURN VARCHAR2
+AS
+    v_session_user VARCHAR2(128);
+    v_manv   VARCHAR2(20);
+    v_vaitro NVARCHAR2(50);
+BEGIN
+    v_session_user := SYS_CONTEXT('USERENV', 'SESSION_USER');
+
+    IF v_session_user IN ('ADMIN_PHANHE1', 'SYS', 'SYSTEM') THEN
+        RETURN '1=1';
+    END IF;
+
+    IF v_session_user NOT LIKE 'C##%' THEN
+        RETURN '1=2';
+    END IF;
+
+    v_manv := SUBSTR(v_session_user, 4);
+
+    SELECT VAITRO INTO v_vaitro
+    FROM ADMIN_PHANHE1.NHANVIEN
+    WHERE MANV = v_manv;
+
+    IF v_vaitro = N'Bác sĩ/Y sĩ' THEN
+        -- Bác sĩ chỉ thấy DV thuộc HSBA mình phụ trách
+        RETURN 'MAHSBA IN (SELECT MAHSBA FROM ADMIN_PHANHE1.HSBA WHERE MABS = ''' || v_manv || ''')';
+    END IF;
+
+    IF v_vaitro = N'Điều phối viên' THEN
+        -- Điều phối viên chỉ thấy DV thuộc HSBA đã có bác sĩ (để điều phối KTV)
+        RETURN 'MAHSBA IN (SELECT MAHSBA FROM ADMIN_PHANHE1.HSBA WHERE MABS IS NOT NULL)';
+    END IF;
+
+    IF v_vaitro = N'Kỹ thuật viên' THEN
+        -- Kỹ thuật viên chỉ thấy DV được phân công cho mình
+        RETURN 'MAKTV = ''' || v_manv || '''';
+    END IF;
+
+    RETURN '1=2';
+
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN RETURN '1=2';
+END;
+/
+
+-- Bảng DONTHUOC
+CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_VPD_DONTHUOC (
+    p_schema IN VARCHAR2,
+    p_table  IN VARCHAR2
+) RETURN VARCHAR2
+AS
+    v_session_user VARCHAR2(128);
+    v_manv   VARCHAR2(20);
+    v_vaitro NVARCHAR2(50);
+BEGIN
+    v_session_user := SYS_CONTEXT('USERENV', 'SESSION_USER');
+
+    IF v_session_user IN ('ADMIN_PHANHE1', 'SYS', 'SYSTEM') THEN
+        RETURN '1=1';
+    END IF;
+
+    IF v_session_user NOT LIKE 'C##%' THEN
+        RETURN '1=2';
+    END IF;
+
+    v_manv := SUBSTR(v_session_user, 4);
+
+    SELECT VAITRO INTO v_vaitro
+    FROM ADMIN_PHANHE1.NHANVIEN
+    WHERE MANV = v_manv;
+
+    IF v_vaitro = N'Bác sĩ/Y sĩ' THEN
+        RETURN 'MAHSBA IN (SELECT MAHSBA FROM ADMIN_PHANHE1.HSBA WHERE MABS = ''' || v_manv || ''')';
+    END IF;
+
+    -- Điều phối viên không truy cập DONTHUOC
+    RETURN '1=2';
+
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN RETURN '1=2';
+END;
+/
+
+-- ============================================================
+-- BƯỚC 3: ĐĂNG KÝ POLICY — mỗi bảng chỉ 1 policy
+-- ============================================================
+
+-- HSBA - tách thành 4 policy riêng
+BEGIN
+    DBMS_RLS.ADD_POLICY(
+        object_schema   => 'ADMIN_PHANHE1',
+        object_name     => 'HSBA',
+        policy_name     => 'POL_HSBA_SEL',
+        function_schema => 'ADMIN_PHANHE1',
+        policy_function => 'FN_VPD_HSBA',
+        statement_types => 'SELECT',
+        enable          => TRUE
+    );
+END;
+/
+BEGIN
+    DBMS_RLS.ADD_POLICY(
+        object_schema   => 'ADMIN_PHANHE1',
+        object_name     => 'HSBA',
+        policy_name     => 'POL_HSBA_INS',
+        function_schema => 'ADMIN_PHANHE1',
+        policy_function => 'FN_VPD_HSBA',
+        statement_types => 'INSERT',
+        enable          => TRUE,
+        update_check    => TRUE 
+    );
+END;
+/
+BEGIN
+    DBMS_RLS.ADD_POLICY(
+        object_schema   => 'ADMIN_PHANHE1',
+        object_name     => 'HSBA',
+        policy_name     => 'POL_HSBA_UPD',
+        function_schema => 'ADMIN_PHANHE1',
+        policy_function => 'FN_VPD_HSBA',
+        statement_types => 'UPDATE',
+        enable          => TRUE
+    );
+END;
+/
+BEGIN
+    DBMS_RLS.ADD_POLICY(
+        object_schema   => 'ADMIN_PHANHE1',
+        object_name     => 'HSBA',
+        policy_name     => 'POL_HSBA_DEL',
+        function_schema => 'ADMIN_PHANHE1',
+        policy_function => 'FN_VPD_HSBA',
+        statement_types => 'DELETE',
+        enable          => TRUE
+    );
+END;
+/
+
+-- BENHNHAN
+BEGIN
+    DBMS_RLS.ADD_POLICY(
+        object_schema   => 'ADMIN_PHANHE1',
+        object_name     => 'BENHNHAN',
+        policy_name     => 'POL_BENHNHAN_SEL',
+        function_schema => 'ADMIN_PHANHE1',
+        policy_function => 'FN_VPD_BENHNHAN',
+        statement_types => 'SELECT',
+        enable          => TRUE
+    );
+END;
+/
+BEGIN
+    DBMS_RLS.ADD_POLICY(
+        object_schema   => 'ADMIN_PHANHE1',
+        object_name     => 'BENHNHAN',
+        policy_name     => 'POL_BENHNHAN_UPD',
+        function_schema => 'ADMIN_PHANHE1',
+        policy_function => 'FN_VPD_BENHNHAN',
+        statement_types => 'UPDATE',
+        enable          => TRUE
+    );
+END;
+/
+
+-- HSBA_DV
+BEGIN
+    DBMS_RLS.ADD_POLICY(
+        object_schema   => 'ADMIN_PHANHE1',
+        object_name     => 'HSBA_DV',
+        policy_name     => 'POL_HSBADV_SEL',
+        function_schema => 'ADMIN_PHANHE1',
+        policy_function => 'FN_VPD_HSBA_DV',
+        statement_types => 'SELECT',
+        enable          => TRUE
+    );
+END;
+/
+BEGIN
+    DBMS_RLS.ADD_POLICY(
+        object_schema   => 'ADMIN_PHANHE1',
+        object_name     => 'HSBA_DV',
+        policy_name     => 'POL_HSBADV_INS',
+        function_schema => 'ADMIN_PHANHE1',
+        policy_function => 'FN_VPD_HSBA_DV',
+        statement_types => 'INSERT',
+        enable          => TRUE,
+        update_check    => TRUE
+    );
+END;
+/
+BEGIN
+    DBMS_RLS.ADD_POLICY(
+        object_schema   => 'ADMIN_PHANHE1',
+        object_name     => 'HSBA_DV',
+        policy_name     => 'POL_HSBADV_UPD',
+        function_schema => 'ADMIN_PHANHE1',
+        policy_function => 'FN_VPD_HSBA_DV',
+        statement_types => 'UPDATE',
+        enable          => TRUE
+    );
+END;
+/
+BEGIN
+    DBMS_RLS.ADD_POLICY(
+        object_schema   => 'ADMIN_PHANHE1',
+        object_name     => 'HSBA_DV',
+        policy_name     => 'POL_HSBADV_DEL',
+        function_schema => 'ADMIN_PHANHE1',
+        policy_function => 'FN_VPD_HSBA_DV',
+        statement_types => 'DELETE',
+        enable          => TRUE
+    );
+END;
+/
+
+-- DONTHUOC
+BEGIN
+    DBMS_RLS.ADD_POLICY(
+        object_schema   => 'ADMIN_PHANHE1',
+        object_name     => 'DONTHUOC',
+        policy_name     => 'POL_DONTHUOC_SEL',
+        function_schema => 'ADMIN_PHANHE1',
+        policy_function => 'FN_VPD_DONTHUOC',
+        statement_types => 'SELECT',
+        enable          => TRUE
+    );
+END;
+/
+BEGIN
+    DBMS_RLS.ADD_POLICY(
+        object_schema   => 'ADMIN_PHANHE1',
+        object_name     => 'DONTHUOC',
+        policy_name     => 'POL_DONTHUOC_INS',
+        function_schema => 'ADMIN_PHANHE1',
+        policy_function => 'FN_VPD_DONTHUOC',
+        statement_types => 'INSERT',
+        enable          => TRUE,
+        update_check    => TRUE
+    );
+END;
+/
+BEGIN
+    DBMS_RLS.ADD_POLICY(
+        object_schema   => 'ADMIN_PHANHE1',
+        object_name     => 'DONTHUOC',
+        policy_name     => 'POL_DONTHUOC_UPD',
+        function_schema => 'ADMIN_PHANHE1',
+        policy_function => 'FN_VPD_DONTHUOC',
+        statement_types => 'UPDATE',
+        enable          => TRUE
+    );
+END;
+/
+BEGIN
+    DBMS_RLS.ADD_POLICY(
+        object_schema   => 'ADMIN_PHANHE1',
+        object_name     => 'DONTHUOC',
+        policy_name     => 'POL_DONTHUOC_DEL',
+        function_schema => 'ADMIN_PHANHE1',
+        policy_function => 'FN_VPD_DONTHUOC',
+        statement_types => 'DELETE',
+        enable          => TRUE
+    );
+END;
+/
+
+-- =====================================================================
+-- VDP (END)
+-- =====================================================================
 
 
 
@@ -1420,7 +1816,7 @@ CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_DONTHUOC_SAUDINH(p_MAHSBA VARCHA
     v_is_bs VARCHAR2(10);
     v_count NUMBER;
 BEGIN
-    v_is_bs := SYS_CONTEXT('SYS_SESSION_ROLES', 'ROLE_YSI_BACSI');
+    v_is_bs := SYS_CONTEXT('SYS_SESSION_ROLES', 'ROLE_BAC_SI');
     -- Dùng Subquery trong PL/SQL thì vô tư, không bị FGA cấm
     SELECT COUNT(*) INTO v_count FROM ADMIN_PHANHE1.HSBA 
     WHERE MAHSBA = p_MAHSBA AND 'C##' || UPPER(MABS) = SYS_CONTEXT('USERENV', 'SESSION_USER');
@@ -1432,7 +1828,7 @@ EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
 -- 2. Hàm cho 3b (Bảng HSBA - Hợp pháp)
 CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_HSBA_HOPPHAP(p_MABS VARCHAR2) RETURN VARCHAR2 AS
 BEGIN
-    IF SYS_CONTEXT('SYS_SESSION_ROLES', 'ROLE_YSI_BACSI') = 'TRUE' AND 
+    IF SYS_CONTEXT('SYS_SESSION_ROLES', 'ROLE_BAC_SI') = 'TRUE' AND 
        SYS_CONTEXT('USERENV', 'SESSION_USER') = 'C##' || UPPER(p_MABS) THEN
         RETURN 'TRUE';
     ELSE RETURN 'FALSE'; END IF;
@@ -1449,14 +1845,14 @@ EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
 -- 4. Hàm cho 3d.1 (Bảng HSBA_DV - Kiểm tra KHÔNG phải Bác sĩ)
 CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_NOT_BACSI RETURN VARCHAR2 AS
 BEGIN
-    IF SYS_CONTEXT('SYS_SESSION_ROLES', 'ROLE_YSI_BACSI') = 'FALSE' THEN RETURN 'TRUE'; ELSE RETURN 'FALSE'; END IF;
+    IF SYS_CONTEXT('SYS_SESSION_ROLES', 'ROLE_BAC_SI') = 'FALSE' THEN RETURN 'TRUE'; ELSE RETURN 'FALSE'; END IF;
 EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
 /
 
 -- 5. Hàm cho 3d.3 (Bảng HSBA_DV - Kiểm tra KHÔNG phải Điều phối viên)
 CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_NOT_DPV RETURN VARCHAR2 AS
 BEGIN
-    IF SYS_CONTEXT('SYS_SESSION_ROLES', 'ROLE_DIEUPHOIVIEN') = 'FALSE' THEN RETURN 'TRUE'; ELSE RETURN 'FALSE'; END IF;
+    IF SYS_CONTEXT('SYS_SESSION_ROLES', 'ROLE_DIEU_PHOI_VIEN') = 'FALSE' THEN RETURN 'TRUE'; ELSE RETURN 'FALSE'; END IF;
 EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
 /
 
