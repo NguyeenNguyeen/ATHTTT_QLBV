@@ -1,42 +1,47 @@
+alter session set container = cdb$root;
+
 ALTER SESSION SET CURRENT_SCHEMA = SYS; -- SYS.V_$SESSION
 
 -- Bỏ qua lớp container bảo mật của Oracle 12c+ để tạo user local dễ dàng
-ALTER SESSION SET "_ORACLE_SCRIPT"=true; 
+-- ALTER SESSION SET "_ORACLE_SCRIPT"=true; -- [REMOVED] Rule 3: Remove Global God Mode 
 
 -- XOÁ THIẾT LẬP FLASHBACK LÊN CÁC BẢNG ĐƯỢC AUDIT -> ĐỂ CÓ THỂ XOÁ ĐƯỢC USER ADMIN
-ALTER TABLE ADMIN_PHANHE1.HSBA NO FLASHBACK ARCHIVE;
-ALTER TABLE ADMIN_PHANHE1.HSBA_DV NO FLASHBACK ARCHIVE;
-ALTER TABLE ADMIN_PHANHE1.DONTHUOC NO FLASHBACK ARCHIVE;
-
-DROP FLASHBACK ARCHIVE fda_phanhe1;
-
-
-DROP USER ADMIN_PHANHE1 CASCADE;
+BEGIN
+    BEGIN EXECUTE IMMEDIATE 'ALTER TABLE C##ADMIN_PHANHE1.HSBA NO FLASHBACK ARCHIVE'; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN EXECUTE IMMEDIATE 'ALTER TABLE C##ADMIN_PHANHE1.HSBA_DV NO FLASHBACK ARCHIVE'; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN EXECUTE IMMEDIATE 'ALTER TABLE C##ADMIN_PHANHE1.DONTHUOC NO FLASHBACK ARCHIVE'; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN EXECUTE IMMEDIATE 'DROP FLASHBACK ARCHIVE fda_phanhe1'; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN EXECUTE IMMEDIATE 'DROP FLASHBACK ARCHIVE FBA_BV_NEW'; EXCEPTION WHEN OTHERS THEN NULL; END;
+END;
 /
 
-
+BEGIN EXECUTE IMMEDIATE 'DROP USER C##ADMIN_PHANHE1 CASCADE'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
 
 -- Tạo user dùng chung cho cả nhóm
-CREATE USER ADMIN_PHANHE1 IDENTIFIED BY "Admin@123456" DEFAULT TABLESPACE USERS;
+CREATE USER C##ADMIN_PHANHE1 IDENTIFIED BY "Admin@123456" DEFAULT TABLESPACE USERS;
 
-ALTER USER ADMIN_PHANHE1 QUOTA UNLIMITED ON USERS;
+ALTER USER C##ADMIN_PHANHE1 QUOTA UNLIMITED ON USERS;
 
 -- Cấp toàn quyền quản trị (DBA)
-GRANT DBA TO ADMIN_PHANHE1;
-GRANT ALTER SYSTEM TO ADMIN_PHANHE1;
-GRANT SELECT ON v_$session TO ADMIN_PHANHE1;
+GRANT DBA TO C##ADMIN_PHANHE1;
+GRANT ALTER SYSTEM TO C##ADMIN_PHANHE1;
+GRANT SELECT ON v_$session TO C##ADMIN_PHANHE1;
+GRANT INHERIT PRIVILEGES ON USER SYS TO C##ADMIN_PHANHE1;
+GRANT INHERIT PRIVILEGES ON USER SYSTEM TO C##ADMIN_PHANHE1;
 
 -- Cấp quyền cứng để chạy Procedure DataPump
-GRANT CREATE TABLE TO ADMIN_PHANHE1;
-GRANT CREATE JOB TO ADMIN_PHANHE1;
-GRANT READ, WRITE ON DIRECTORY BACKUP_DIR TO ADMIN_PHANHE1;
-GRANT DATAPUMP_EXP_FULL_DATABASE TO ADMIN_PHANHE1;
-GRANT DATAPUMP_IMP_FULL_DATABASE TO ADMIN_PHANHE1;
+GRANT CREATE TABLE TO C##ADMIN_PHANHE1;
+GRANT CREATE JOB TO C##ADMIN_PHANHE1;
+-- Đã thêm bẫy lỗi để né lỗi nếu Directory chưa được tạo
+BEGIN EXECUTE IMMEDIATE 'GRANT READ, WRITE ON DIRECTORY BACKUP_DIR TO C##ADMIN_PHANHE1'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+GRANT DATAPUMP_EXP_FULL_DATABASE TO C##ADMIN_PHANHE1;
+GRANT DATAPUMP_IMP_FULL_DATABASE TO C##ADMIN_PHANHE1;
 
 
-ALTER SESSION SET "_ORACLE_SCRIPT"=false;
-ALTER SESSION SET CURRENT_SCHEMA = ADMIN_PHANHE1;
-
+-- ALTER SESSION SET "_ORACLE_SCRIPT"=false; -- [REMOVED]
+ALTER SESSION SET CURRENT_SCHEMA = C##ADMIN_PHANHE1;
 
 
 -- ==========================================
@@ -44,13 +49,13 @@ ALTER SESSION SET CURRENT_SCHEMA = ADMIN_PHANHE1;
 -- ==========================================
 
 -- Bảng KHOA
-CREATE TABLE KHOA (
+CREATE TABLE C##ADMIN_PHANHE1.KHOA (
     MAKHOA VARCHAR2(20) PRIMARY KEY,
     TENKHOA NVARCHAR2(100)
 );
 
 -- Bảng NHÂN VIÊN
-CREATE TABLE NHANVIEN (
+CREATE TABLE C##ADMIN_PHANHE1.NHANVIEN (
     MANV VARCHAR2(20) PRIMARY KEY,
     HOTEN NVARCHAR2(100),
     PHAI NVARCHAR2(10),
@@ -64,7 +69,7 @@ CREATE TABLE NHANVIEN (
 );
 
 -- Bảng BỆNH NHÂN
-CREATE TABLE BENHNHAN (
+CREATE TABLE C##ADMIN_PHANHE1.BENHNHAN (
     MABN VARCHAR2(20) PRIMARY KEY,
     TENBN NVARCHAR2(100),
     PHAI NVARCHAR2(10),
@@ -79,14 +84,6 @@ CREATE TABLE BENHNHAN (
     DIUNGTHUOC NVARCHAR2(1000)
 );
 
--- Bảng THÔNG BÁO (Độc lập, dùng cho OLS)
-CREATE TABLE THONG_BAO (
-    MATB VARCHAR2(20) PRIMARY KEY,
-    NOIDUNG NVARCHAR2(1000),
-    NGAYGIO TIMESTAMP,
-    DIADIEM NVARCHAR2(100),
-    OLS_LABEL NUMBER(10) -- Cột lưu mã số của nhãn OLS
-);
 
 
 -- ==========================================
@@ -94,7 +91,7 @@ CREATE TABLE THONG_BAO (
 -- ==========================================
 
 -- Bảng HỒ SƠ BỆNH ÁN (HSBA)
-CREATE TABLE HSBA (
+CREATE TABLE C##ADMIN_PHANHE1.HSBA (
     MAHSBA VARCHAR2(20) PRIMARY KEY,
     MABN VARCHAR2(20),
     NGAY DATE,
@@ -111,7 +108,7 @@ CREATE TABLE HSBA (
 );
 
 -- Bảng DỊCH VỤ HỒ SƠ BỆNH ÁN (HSBA_DV)
-CREATE TABLE HSBA_DV (
+CREATE TABLE C##ADMIN_PHANHE1.HSBA_DV (
     MAHSBA VARCHAR2(20),
     LOAIDV NVARCHAR2(100),
     NGAYDV DATE,
@@ -127,7 +124,7 @@ CREATE TABLE HSBA_DV (
 );
 
 -- Bảng ĐƠN THUỐC
-CREATE TABLE DONTHUOC (
+CREATE TABLE C##ADMIN_PHANHE1.DONTHUOC (
     MAHSBA VARCHAR2(20),
     TENTHUOC NVARCHAR2(100),
     NGAYDT DATE,
@@ -185,31 +182,27 @@ INSERT INTO DONTHUOC VALUES ('HS000001', N'Concor 5mg', TO_DATE('10-04-26', 'DD-
 INSERT INTO DONTHUOC VALUES ('HS000002', N'Paracetamol 500mg', TO_DATE('11-04-26', 'DD-MM-YY'), N'Ngày 2 viên, sáng/tối khi đau đầu');
 INSERT INTO DONTHUOC VALUES ('HS000003', N'Omeprazole 20mg', TO_DATE('12-04-26', 'DD-MM-YY'), N'Ngày 1 viên, uống trước khi ăn sáng 30 phút');
 
--- THONG_BAO (Dành cho OLS - Hiện tại để trống nhãn OLS_LABEL chờ Phân hệ 2)
-INSERT INTO THONG_BAO VALUES ('TB001', N'Họp giao ban toàn viện tháng 4', TO_TIMESTAMP('20-04-26 08:00:00', 'DD-MM-YY HH24:MI:SS'), N'Hội trường A', NULL);
-INSERT INTO THONG_BAO VALUES ('TB002', N'Họp khẩn Ban Lãnh đạo Khoa Tim mạch', TO_TIMESTAMP('21-04-26 14:00:00', 'DD-MM-YY HH24:MI:SS'), N'Phòng họp 1 - Cơ sở HCM', NULL);
-
 COMMIT;
 
 -- ---------------------------------------------------------------------------------------------------------------------------------------------------
 -- ------------------------------------------------------------------------ PROCEDURE ----------------------------------------------------------------
 -- ---------------------------------------------------------------------------------------------------------------------------------------------------
 -- Tạo bộ đếm sequence cho bệnh nhân
-CREATE SEQUENCE ADMIN_PHANHE1.SEQ_MABN 
+CREATE SEQUENCE C##ADMIN_PHANHE1.SEQ_MABN 
 START WITH 1 
 INCREMENT BY 1 
 NOCACHE 
 NOCYCLE;
 
 -- Tạo bộ đếm sequence cho nhân viên
-CREATE SEQUENCE ADMIN_PHANHE1.SEQ_MANV 
+CREATE SEQUENCE C##ADMIN_PHANHE1.SEQ_MANV 
 START WITH 1 
 INCREMENT BY 1 
 NOCACHE 
 NOCYCLE;
 
 -- Tạo procedure thêm Bệnh nhân
-CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_TAO_BENHNHAN (
+CREATE OR REPLACE PROCEDURE C##ADMIN_PHANHE1.SP_TAO_BENHNHAN (
     p_TENBN IN NVARCHAR2,
     p_PHAI IN NVARCHAR2,
     p_NGAYSINH IN DATE,
@@ -232,7 +225,7 @@ IS
 BEGIN
     -- Bước 1: Sinh mã bệnh nhân tự động
     -- Lấy số đếm tiếp theo từ Sequence
-    SELECT ADMIN_PHANHE1.SEQ_MABN.NEXTVAL INTO v_seq_val FROM DUAL;
+    SELECT C##ADMIN_PHANHE1.SEQ_MABN.NEXTVAL INTO v_seq_val FROM DUAL;
     
     -- Định dạng mã bệnh nhân (Ví dụ: BN0001, BN0002...)
     v_MABN := 'BN' || TO_CHAR(v_seq_val, 'FM0000'); 
@@ -241,7 +234,7 @@ BEGIN
     p_MABN_OUT := v_MABN;
 
     -- Bước 2: Thêm thông tin vào bảng BENHNHAN
-    INSERT INTO ADMIN_PHANHE1.BENHNHAN 
+    INSERT INTO C##ADMIN_PHANHE1.BENHNHAN 
         (MABN, TENBN, PHAI, NGAYSINH, CCCD, SONHA, TENDUONG, QUANHUYEN, TINHTP, TIENSUBENH, TIENSUBENHGD, DIUNGTHUOC)
     VALUES 
         (v_MABN, p_TENBN, p_PHAI, p_NGAYSINH, p_CCCD, p_SONHA, p_TENDUONG, p_QUANHUYEN, p_TINHTP, p_TIENSUBENH, p_TIENSUBENHGD, p_DIUNGTHUOC);
@@ -253,6 +246,14 @@ BEGIN
     -- Bước 4: Cấp quyền kết nối
     v_sql := 'GRANT CREATE SESSION TO C##' || v_MABN;
     EXECUTE IMMEDIATE v_sql;
+
+    -- Bước 5: Gán role RBAC cho bệnh nhân nếu role đã được cài đặt
+    BEGIN
+        v_sql := 'GRANT ROLE_BENHNHAN TO C##' || v_MABN;
+        EXECUTE IMMEDIATE v_sql;
+    EXCEPTION
+        WHEN OTHERS THEN NULL;
+    END;
 
     -- Hoàn tất toàn bộ giao dịch
     COMMIT;
@@ -266,7 +267,7 @@ END;
 /
 
 -- Tạo procedure thêm Nhân viên
-CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_TAO_NHANVIEN (
+CREATE OR REPLACE PROCEDURE C##ADMIN_PHANHE1.SP_TAO_NHANVIEN (
     p_HOTEN IN NVARCHAR2,
     p_PHAI IN NVARCHAR2,
     p_NGAYSINH IN DATE,
@@ -287,7 +288,7 @@ IS
 BEGIN
     -- Bước 1: Sinh mã nhân viên tự động
     -- Lấy số đếm tiếp theo từ Sequence của Nhân Viên
-    SELECT ADMIN_PHANHE1.SEQ_MANV.NEXTVAL INTO v_seq_val FROM DUAL;
+    SELECT C##ADMIN_PHANHE1.SEQ_MANV.NEXTVAL INTO v_seq_val FROM DUAL;
     
     -- Định dạng mã (Ví dụ: NV0001, NV0002...)
     v_MANV := 'NV' || TO_CHAR(v_seq_val, 'FM0000'); 
@@ -296,7 +297,7 @@ BEGIN
     p_MANV_OUT := v_MANV;
 
     -- Bước 2: Thêm thông tin vào bảng NHANVIEN
-    INSERT INTO ADMIN_PHANHE1.NHANVIEN 
+    INSERT INTO C##ADMIN_PHANHE1.NHANVIEN 
         (MANV, HOTEN, PHAI, NGAYSINH, CMND, QUEQUAN, SODT, VAITRO, CHUYENKHOA, COSO)
     VALUES 
         (v_MANV, p_HOTEN, p_PHAI, p_NGAYSINH, p_CMND, p_QUEQUAN, p_SODT, p_VAITRO, p_CHUYENKHOA, p_COSO);
@@ -308,6 +309,16 @@ BEGIN
     -- Bước 4: Cấp quyền kết nối cơ bản
     v_sql := 'GRANT CREATE SESSION TO C##' || v_MANV;
     EXECUTE IMMEDIATE v_sql;
+
+    -- Bước 5: Gán role RBAC cho kỹ thuật viên nếu role đã được cài đặt
+    IF REGEXP_LIKE(LOWER(p_VAITRO), 'thu.*t.*vi') THEN
+        BEGIN
+            v_sql := 'GRANT ROLE_KYTHUATVIEN TO C##' || v_MANV;
+            EXECUTE IMMEDIATE v_sql;
+        EXCEPTION
+            WHEN OTHERS THEN NULL;
+        END;
+    END IF;
 
     -- Hoàn tất toàn bộ giao dịch, lưu dữ liệu vĩnh viễn
     COMMIT;
@@ -322,7 +333,7 @@ END;
 
 
 -- Xem nhân viên theo mã
-CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_XEM_MOT_NHANVIEN (
+CREATE OR REPLACE PROCEDURE C##ADMIN_PHANHE1.SP_XEM_MOT_NHANVIEN (
     p_MANV IN VARCHAR2,
     p_CURSOR OUT SYS_REFCURSOR -- Con trỏ chứa bảng dữ liệu trả về cho C#
 )
@@ -339,13 +350,13 @@ BEGIN
            VAITRO AS "Vai Trò", 
            CHUYENKHOA AS "Chuyên Khoa", 
            COSO AS "Cơ Sở"
-    FROM ADMIN_PHANHE1.NHANVIEN
+    FROM C##ADMIN_PHANHE1.NHANVIEN
     WHERE MANV = p_MANV;
 END;
 /
 
 -- Xem tất cả nhân viên
-CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_XEM_ALL_NHANVIEN (
+CREATE OR REPLACE PROCEDURE C##ADMIN_PHANHE1.SP_XEM_ALL_NHANVIEN (
     p_CURSOR OUT SYS_REFCURSOR
 )
 AS
@@ -361,13 +372,13 @@ BEGIN
            VAITRO AS "Vai Trò", 
            CHUYENKHOA AS "Chuyên Khoa", 
            COSO AS "Cơ Sở"
-    FROM ADMIN_PHANHE1.NHANVIEN
+    FROM C##ADMIN_PHANHE1.NHANVIEN
     ORDER BY MANV;
 END;
 /
 
 -- Xem danh sách bệnh nhân theo mã bệnh nhân
-CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_XEM_MOT_BENHNHAN (
+CREATE OR REPLACE PROCEDURE C##ADMIN_PHANHE1.SP_XEM_MOT_BENHNHAN (
     p_MABN IN VARCHAR2,
     p_CURSOR OUT SYS_REFCURSOR
 )
@@ -385,13 +396,13 @@ BEGIN
            TIENSUBENH AS "Tiền Sử Bệnh", 
            TIENSUBENHGD AS "TS Bệnh Gia Đình", 
            DIUNGTHUOC AS "Dị Ứng Thuốc"
-    FROM ADMIN_PHANHE1.BENHNHAN
+    FROM C##ADMIN_PHANHE1.BENHNHAN
     WHERE MABN = p_MABN;
 END;
 /
 
 -- Xem danh sách tất cả bệnh nhân
-CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_XEM_ALL_BENHNHAN (
+CREATE OR REPLACE PROCEDURE C##ADMIN_PHANHE1.SP_XEM_ALL_BENHNHAN (
     p_CURSOR OUT SYS_REFCURSOR
 )
 AS
@@ -408,13 +419,13 @@ BEGIN
            TIENSUBENH AS "Tiền Sử Bệnh", 
            TIENSUBENHGD AS "TS Bệnh Gia Đình", 
            DIUNGTHUOC AS "Dị Ứng Thuốc"
-    FROM ADMIN_PHANHE1.BENHNHAN
+    FROM C##ADMIN_PHANHE1.BENHNHAN
     ORDER BY MABN;
 END;
 /
 
 -- Xóa bệnh nhân
-CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_XOA_BENHNHAN (
+CREATE OR REPLACE PROCEDURE C##ADMIN_PHANHE1.SP_XOA_BENHNHAN (
     p_MABN IN VARCHAR2
 )
 AUTHID CURRENT_USER
@@ -432,11 +443,12 @@ BEGIN
     END LOOP;
 
     -- Bước 1: Xóa thông tin record trong bảng BENHNHAN
-    DELETE FROM ADMIN_PHANHE1.BENHNHAN WHERE MABN = p_MABN;
+    DELETE FROM C##ADMIN_PHANHE1.BENHNHAN WHERE MABN = p_MABN;
 
     -- Bước 2: Xóa tài khoản Oracle
     v_sql := 'DROP USER ' || v_username || ' CASCADE';
     EXECUTE IMMEDIATE v_sql;
+    EXECUTE IMMEDIATE 'ALTER SESSION SET "_ORACLE_SCRIPT"=false';
 
 EXCEPTION
     WHEN OTHERS THEN
@@ -446,7 +458,7 @@ END;
 /
 
 -- Xóa nhân viên
-CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_XOA_NHANVIEN (
+CREATE OR REPLACE PROCEDURE C##ADMIN_PHANHE1.SP_XOA_NHANVIEN (
     p_MANV IN VARCHAR2
 )
 AUTHID CURRENT_USER
@@ -464,11 +476,12 @@ BEGIN
     END LOOP;
 
     -- Bước 1: Xóa dữ liệu trong bảng NHANVIEN
-    DELETE FROM ADMIN_PHANHE1.NHANVIEN WHERE MANV = p_MANV;
+    DELETE FROM C##ADMIN_PHANHE1.NHANVIEN WHERE MANV = p_MANV;
 
     -- Bước 2: Xóa tài khoản Oracle
     v_sql := 'DROP USER ' || v_username || ' CASCADE';
     EXECUTE IMMEDIATE v_sql;
+    EXECUTE IMMEDIATE 'ALTER SESSION SET "_ORACLE_SCRIPT"=false';
 
 EXCEPTION
     WHEN OTHERS THEN
@@ -479,7 +492,7 @@ END;
 
 
 -- Cập nhật thông tin bệnh nhân
-CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_SUA_BENHNHAN (
+CREATE OR REPLACE PROCEDURE C##ADMIN_PHANHE1.SP_SUA_BENHNHAN (
     p_MABN IN VARCHAR2, -- Vẫn phải truyền vào để làm điều kiện WHERE tìm đúng người
     p_TENBN IN NVARCHAR2,
     p_PHAI IN NVARCHAR2,
@@ -500,7 +513,7 @@ IS
 BEGIN
     -- Bước 1: Cập nhật thông tin cá nhân trong bảng BENHNHAN
     -- (Hoàn toàn KHÔNG đụng chạm đến cột MABN)
-    UPDATE ADMIN_PHANHE1.BENHNHAN 
+    UPDATE C##ADMIN_PHANHE1.BENHNHAN 
     SET TENBN = p_TENBN,
         PHAI = p_PHAI,
         NGAYSINH = p_NGAYSINH,
@@ -532,11 +545,8 @@ END;
 /
 
 -- Cập nhật thông tin Nhân viên
--- Lệnh xóa (Nếu chưa có sẽ báo lỗi ORA-04043, bạn cứ bỏ qua không sao nhé)
-DROP PROCEDURE ADMIN_PHANHE1.SP_SUA_NHANVIEN;
-
--- Lệnh tạo mới
-CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_SUA_NHANVIEN (
+-- Lệnh tạo mới (Bỏ DROP cũ đi để an toàn ghi đè)
+CREATE OR REPLACE PROCEDURE C##ADMIN_PHANHE1.SP_SUA_NHANVIEN (
     p_MANV IN VARCHAR2, -- Mã NV dùng để xác định người cần sửa
     p_HOTEN IN NVARCHAR2,
     p_PHAI IN NVARCHAR2,
@@ -554,7 +564,7 @@ IS
     v_sql VARCHAR2(500);
 BEGIN
     -- Bước 1: Cập nhật thông tin cá nhân trong bảng NHANVIEN
-    UPDATE ADMIN_PHANHE1.NHANVIEN 
+    UPDATE C##ADMIN_PHANHE1.NHANVIEN 
     SET HOTEN = p_HOTEN,
         PHAI = p_PHAI,
         NGAYSINH = p_NGAYSINH,
@@ -572,6 +582,18 @@ BEGIN
         EXECUTE IMMEDIATE v_sql;
     END IF;
 
+    -- Bước 3: Cập nhật role RBAC nếu vai trò được đổi sang/ra khỏi Kỹ thuật viên
+    BEGIN
+        IF REGEXP_LIKE(LOWER(p_VAITRO), 'thu.*t.*vi') THEN
+            v_sql := 'GRANT ROLE_KYTHUATVIEN TO C##' || p_MANV;
+        ELSE
+            v_sql := 'REVOKE ROLE_KYTHUATVIEN FROM C##' || p_MANV;
+        END IF;
+        EXECUTE IMMEDIATE v_sql;
+    EXCEPTION
+        WHEN OTHERS THEN NULL;
+    END;
+
     -- Hoàn tất và lưu dữ liệu
     COMMIT;
 
@@ -585,13 +607,10 @@ END;
 
 
 -- Xem quyền trên toàn bộ nhân viên
-GRANT SELECT ANY DICTIONARY TO ADMIN_PHANHE1;
-
--- Lệnh xóa (Chỉ chạy khi Procedure đã tồn tại, nếu không sẽ báo lỗi ORA-04043)
-DROP PROCEDURE ADMIN_PHANHE1.SP_XEM_QUYEN_ALL_USER;
+GRANT SELECT ANY DICTIONARY TO C##ADMIN_PHANHE1;
 
 -- Lệnh tạo mới (hoặc ghi đè)
-CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_XEM_QUYEN_ALL_USER (
+CREATE OR REPLACE PROCEDURE C##ADMIN_PHANHE1.SP_XEM_QUYEN_ALL_USER (
     p_CURSOR OUT SYS_REFCURSOR
 )
 AUTHID CURRENT_USER 
@@ -605,14 +624,14 @@ BEGIN
     FROM DBA_TAB_PRIVS p
     JOIN DBA_OBJECTS o ON p.TABLE_NAME = o.OBJECT_NAME AND p.OWNER = o.OWNER
     WHERE p.GRANTEE LIKE 'C##%' 
-      AND p.GRANTEE NOT IN ('C##ADMIN', 'ADMIN_PHANHE1', USER) 
-      AND p.OWNER = 'ADMIN_PHANHE1'
+      AND p.GRANTEE NOT IN ('C##ADMIN', 'C##ADMIN_PHANHE1', USER) 
+      AND p.OWNER = 'C##ADMIN_PHANHE1'
       AND o.OBJECT_TYPE = 'TABLE'
     ORDER BY p.GRANTEE, p.TABLE_NAME;
 END;
 /
 -- Xem quyền trên cột
-CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_XEM_QUYEN_COT_ALL_USER (
+CREATE OR REPLACE PROCEDURE C##ADMIN_PHANHE1.SP_XEM_QUYEN_COT_ALL_USER (
     p_CURSOR OUT SYS_REFCURSOR
 )
 AUTHID CURRENT_USER -- Vẫn giữ cơ chế "động" theo tài khoản DBA đang đăng nhập
@@ -627,12 +646,12 @@ BEGIN
     FROM DBA_COL_PRIVS 
     WHERE GRANTEE LIKE 'C##%' 
       AND GRANTEE != 'C##ADMIN'
-      AND OWNER = 'ADMIN_PHANHE1'
+      AND OWNER = 'C##ADMIN_PHANHE1'
     ORDER BY GRANTEE, TABLE_NAME, COLUMN_NAME;
 END;
 /
 -- Xem quyền trên view
-CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_XEM_QUYEN_VIEW_ALL_USER (
+CREATE OR REPLACE PROCEDURE C##ADMIN_PHANHE1.SP_XEM_QUYEN_VIEW_ALL_USER (
     p_CURSOR OUT SYS_REFCURSOR
 )
 AUTHID CURRENT_USER
@@ -647,14 +666,14 @@ BEGIN
     FROM DBA_TAB_PRIVS p
     JOIN DBA_OBJECTS o ON p.TABLE_NAME = o.OBJECT_NAME AND p.OWNER = o.OWNER
     WHERE p.GRANTEE LIKE 'C##%'
-      AND p.GRANTEE NOT IN ('C##ADMIN', 'ADMIN_PHANHE1', USER)
-      AND p.OWNER = 'ADMIN_PHANHE1'
+      AND p.GRANTEE NOT IN ('C##ADMIN', 'C##ADMIN_PHANHE1', USER)
+      AND p.OWNER = 'C##ADMIN_PHANHE1'
       AND o.OBJECT_TYPE = 'VIEW' -- Chỉ lọc lấy View
     ORDER BY p.GRANTEE, p.TABLE_NAME;
 END;
 /
 -- Xem quyền trên procedure/function
-CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_XEM_QUYEN_PROC_ALL_USER (
+CREATE OR REPLACE PROCEDURE C##ADMIN_PHANHE1.SP_XEM_QUYEN_PROC_ALL_USER (
     p_CURSOR OUT SYS_REFCURSOR
 )
 AUTHID CURRENT_USER
@@ -669,8 +688,8 @@ BEGIN
     FROM DBA_TAB_PRIVS p
     JOIN DBA_OBJECTS o ON p.TABLE_NAME = o.OBJECT_NAME AND p.OWNER = o.OWNER
     WHERE p.GRANTEE LIKE 'C##%'
-      AND p.GRANTEE NOT IN ('C##ADMIN', 'ADMIN_PHANHE1', USER)
-      AND p.OWNER = 'ADMIN_PHANHE1'
+      AND p.GRANTEE NOT IN ('C##ADMIN', 'C##ADMIN_PHANHE1', USER)
+      AND p.OWNER = 'C##ADMIN_PHANHE1'
       AND o.OBJECT_TYPE IN ('PROCEDURE', 'FUNCTION') -- Lọc lấy Procedure và Function
     ORDER BY p.GRANTEE, p.TABLE_NAME;
 END;
@@ -684,105 +703,10 @@ END;
 -- =================================================================================
 
 -- =================================================================================
--- 3.1 CẤP QUYỀN TRÊN BẢNG (TABLE) / VIEW
--- =================================================================================
-
--- -- Cấp quyền trên toàn bộ bảng hoặc view
--- GRANT <PRIVILEGE> 
--- ON ADMIN_PHANHE1.<OBJECT_NAME> 
--- TO <GRANTEE>;
-
--- -- Trong đó:
--- -- <PRIVILEGE>: SELECT | INSERT | UPDATE | DELETE
--- -- <OBJECT_NAME>: tên bảng hoặc view
--- -- <GRANTEE>: USER hoặc ROLE
-
--- -- Cấp quyền kèm WITH GRANT OPTION (chỉ áp dụng cho USER)
--- GRANT <PRIVILEGE> 
--- ON ADMIN_PHANHE1.<OBJECT_NAME> 
--- TO <USERNAME> 
--- WITH GRANT OPTION;
-
-
--- -- =================================================================================
--- -- 3.2 CẤP QUYỀN TRÊN CỘT (COLUMN-LEVEL)
--- -- =================================================================================
-
--- -- Chỉ áp dụng cho SELECT và UPDATE
-
--- -- Cấp quyền SELECT trên các cột cụ thể
--- GRANT SELECT (<COLUMN_1>, <COLUMN_2>) 
--- ON ADMIN_PHANHE1.<TABLE_NAME> 
--- TO <GRANTEE>;
-
--- -- Cấp quyền UPDATE trên các cột cụ thể
--- GRANT UPDATE (<COLUMN_1>, <COLUMN_2>) 
--- ON ADMIN_PHANHE1.<TABLE_NAME> 
--- TO <GRANTEE>;
-
-
--- -- =================================================================================
--- -- 3.3 CẤP QUYỀN TRÊN PROCEDURE / FUNCTION
--- -- =================================================================================
-
--- -- Chỉ sử dụng quyền EXECUTE
--- GRANT EXECUTE 
--- ON ADMIN_PHANHE1.<PROGRAM_NAME> 
--- TO <GRANTEE>;
-
--- -- <PROGRAM_NAME>: tên PROCEDURE hoặc FUNCTION
-
-
--- -- =================================================================================
--- -- 3.4 CẤP ROLE CHO USER
--- -- =================================================================================
-
--- -- Gán ROLE cho USER
--- GRANT <ROLE_NAME> 
--- TO <USERNAME>;
-
--- -- Gán ROLE kèm quyền quản trị (ADMIN OPTION)
--- GRANT <ROLE_NAME> 
--- TO <USERNAME> 
--- WITH ADMIN OPTION;
-
--- =================================================================================
--- CÁC CÂU TRUY VẤN HỖ TRỢ GIAO DIỆN (WINFORM)
--- =================================================================================
--- 1. Lấy danh sách cột của 1 bảng
-SELECT COLUMN_NAME
-FROM ALL_TAB_COLUMNS
-WHERE OWNER = 'ADMIN_PHANHE1'
-AND TABLE_NAME = UPPER(:p_table_name)
-ORDER BY COLUMN_ID;
-
-
--- 2. Lấy danh sách TABLE
-SELECT TABLE_NAME
-FROM ALL_TABLES
-WHERE OWNER = 'ADMIN_PHANHE1'
-ORDER BY TABLE_NAME;
-
-
--- 3. Lấy danh sách VIEW
-SELECT VIEW_NAME
-FROM ALL_VIEWS
-WHERE OWNER = 'ADMIN_PHANHE1'
-ORDER BY VIEW_NAME;
-
-
--- 4. Lấy danh sách PROCEDURE và FUNCTION
-SELECT OBJECT_NAME
-FROM ALL_OBJECTS
-WHERE OWNER = 'ADMIN_PHANHE1'
-AND OBJECT_TYPE IN ('PROCEDURE', 'FUNCTION')
-ORDER BY OBJECT_NAME;
-
--- =================================================================================
 -- [NHIỆM VỤ 3]: PROCEDURE
 -- =================================================================================
 -- PROCEDURE cấp mọi loại quyền ---
-CREATE OR REPLACE PROCEDURE SP_GRANT_ANY_OBJECT (
+CREATE OR REPLACE PROCEDURE C##ADMIN_PHANHE1.SP_GRANT_ANY_OBJECT (
     p_GRANTEE       IN VARCHAR2,
     p_PRIVILEGE     IN VARCHAR2,
     p_OBJECT_NAME   IN VARCHAR2,
@@ -818,16 +742,13 @@ BEGIN
 
     -- Xây dựng câu lệnh dynamic SQL
     v_sql := 'GRANT ' || v_privilege || v_column_str || 
-             ' ON ADMIN_PHANHE1.' || v_obj || 
+             ' ON C##ADMIN_PHANHE1.' || v_obj || 
              ' TO ' || v_grantee || v_grant_option_str;
 
     DBMS_OUTPUT.PUT_LINE('Executing: ' || v_sql);
     
     -- Thực thi câu lệnh
     EXECUTE IMMEDIATE v_sql;
-    
-    -- Lưu ý: Lệnh GRANT thường không cần COMMIT vì nó là DDL (Data Definition Language)
-    -- Nhưng nếu bạn muốn giữ COMMIT để đảm bảo tính nhất quán trong logic riêng thì có thể để lại.
     COMMIT;
 
 EXCEPTION
@@ -839,7 +760,7 @@ END;
 
 -- >>> 3.2 CÁC TRUY VẤN HỖ TRỢ LOAD DỮ LIỆU LÊN WINFORM
 -- Lấy danh sách bảng
-CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_GET_LIST_TABLES (
+CREATE OR REPLACE PROCEDURE C##ADMIN_PHANHE1.SP_GET_LIST_TABLES (
     p_CURSOR OUT SYS_REFCURSOR
 )
 AUTHID CURRENT_USER
@@ -848,12 +769,12 @@ BEGIN
     OPEN p_CURSOR FOR
     SELECT TABLE_NAME AS "Tên Bảng"
     FROM ALL_TABLES
-    WHERE OWNER = 'ADMIN_PHANHE1'
+    WHERE OWNER = 'C##ADMIN_PHANHE1'
     ORDER BY TABLE_NAME;
 END;
 /
 -- Lấy danh sách cột của 1 bảng
-CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_GET_COLUMNS (
+CREATE OR REPLACE PROCEDURE C##ADMIN_PHANHE1.SP_GET_COLUMNS (
     p_TABLE_NAME IN VARCHAR2,
     p_CURSOR OUT SYS_REFCURSOR
 )
@@ -862,16 +783,14 @@ BEGIN
     OPEN p_CURSOR FOR
     SELECT COLUMN_NAME
     FROM ALL_TAB_COLUMNS
-    WHERE OWNER = 'ADMIN_PHANHE1'
+    WHERE OWNER = 'C##ADMIN_PHANHE1'
     AND TABLE_NAME = UPPER(p_TABLE_NAME)
     ORDER BY COLUMN_ID;
 END;
 /
 
 -- lấy danh sách view
--- Lệnh xóa nếu đã tồn tại
-
-CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_GET_LIST_VIEWS (
+CREATE OR REPLACE PROCEDURE C##ADMIN_PHANHE1.SP_GET_LIST_VIEWS (
     p_CURSOR OUT SYS_REFCURSOR
 )
 AUTHID CURRENT_USER
@@ -880,16 +799,13 @@ BEGIN
     OPEN p_CURSOR FOR
     SELECT OBJECT_NAME AS "Tên View"
     FROM ALL_OBJECTS
-    WHERE OWNER = 'ADMIN_PHANHE1'
+    WHERE OWNER = 'C##ADMIN_PHANHE1'
       AND OBJECT_TYPE = 'VIEW'
     ORDER BY OBJECT_NAME;
 END;
 /
 -- lấy danh sách procedure / function
--- Lệnh xóa nếu đã tồn tại
-
--- Lệnh tạo mới
-CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_GET_LIST_PROCS_FUNCS (
+CREATE OR REPLACE PROCEDURE C##ADMIN_PHANHE1.SP_GET_LIST_PROCS_FUNCS (
     p_CURSOR OUT SYS_REFCURSOR
 )
 AUTHID CURRENT_USER
@@ -899,7 +815,7 @@ BEGIN
     SELECT OBJECT_NAME AS "Tên Đối Tượng",
            OBJECT_TYPE AS "Loại Đối Tượng" -- Trả về chữ 'PROCEDURE' hoặc 'FUNCTION' để phân biệt
     FROM ALL_OBJECTS
-    WHERE OWNER = 'ADMIN_PHANHE1'
+    WHERE OWNER = 'C##ADMIN_PHANHE1'
       AND OBJECT_TYPE IN ('PROCEDURE', 'FUNCTION')
     ORDER BY OBJECT_TYPE, OBJECT_NAME;
 END;
@@ -910,7 +826,7 @@ END;
 
 -- PROCEDURE 4 THU HỒI QUYỀN TỪ ROLE, USER ------------
 ------------------------------------------------------
-CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_REVOKE_PRIVILEGE (
+CREATE OR REPLACE PROCEDURE C##ADMIN_PHANHE1.SP_REVOKE_PRIVILEGE (
     p_GRANTEE IN VARCHAR2,      
     p_PRIVILEGE IN VARCHAR2,    
     p_OBJECT_NAME IN VARCHAR2   
@@ -929,7 +845,7 @@ BEGIN
     IF v_obj IS NOT NULL THEN
         v_obj := DBMS_ASSERT.SIMPLE_SQL_NAME(v_obj);
         v_sql := 'REVOKE ' || v_priv || 
-                 ' ON ADMIN_PHANHE1.' || v_obj || 
+                 ' ON C##ADMIN_PHANHE1.' || v_obj || 
                  ' FROM ' || v_grantee;
     ELSE
         -- Nhánh này chỉ chạy khi p_OBJECT_NAME thực sự là rỗng (thu hồi ROLE)
@@ -945,7 +861,7 @@ END;
 
 -- ================================================================================= TAB ROLE PROCEDURE =================================================================================
 -- Xóa role --
-create or replace PROCEDURE SP_XOA_ROLE (
+create or replace PROCEDURE C##ADMIN_PHANHE1.SP_XOA_ROLE (
     p_ten_role IN VARCHAR2
 ) 
 IS
@@ -975,7 +891,7 @@ EXCEPTION
 END;
 /
 -- Xem tất cả role
-create or replace PROCEDURE SP_XEM_TAT_CA_ROLE (
+create or replace PROCEDURE C##ADMIN_PHANHE1.SP_XEM_TAT_CA_ROLE (
   p_recordset OUT SYS_REFCURSOR
 )
 IS
@@ -991,7 +907,7 @@ EXCEPTION
 END;
 /
 -- Tạo role và cấp quyền
-create or replace PROCEDURE SP_TAO_ROLE_VA_CAP_QUYEN (
+create or replace PROCEDURE C##ADMIN_PHANHE1.SP_TAO_ROLE_VA_CAP_QUYEN (
     p_ten_role IN VARCHAR2,
     p_quyen    IN VARCHAR2, -- Ví dụ: 'INSERT', 'SELECT', 'UPDATE'
     p_ten_bang IN VARCHAR2  -- Ví dụ: 'NHANVIEN'
@@ -1017,6 +933,7 @@ EXECUTE IMMEDIATE 'ALTER SESSION SET "_ORACLE_SCRIPT"=true';
 
     -- 4. Thực thi gán quyền
     EXECUTE IMMEDIATE v_sql_grant;
+    EXECUTE IMMEDIATE 'ALTER SESSION SET "_ORACLE_SCRIPT"=false';
 
 EXCEPTION
     WHEN OTHERS THEN
@@ -1032,9 +949,13 @@ END;
 -- =================================================================
 
 -- THAY ĐÔI THÀNH ĐƯỜNG DẪN THÍCH HỢP TRONG WINDOW: 1 THƯ MỤC ĐỂ LƯU CÁC FILE BACKUP CD: C:\Backup_Oracle
-CREATE OR REPLACE DIRECTORY BACKUP_DIR AS '/backup'; 
-GRANT READ, WRITE ON DIRECTORY BACKUP_DIR TO system;
-GRANT READ, WRITE ON DIRECTORY BACKUP_DIR TO ADMIN_PHANHE1;
+-- Bẫy lỗi Directory để tránh nghẽn script
+BEGIN EXECUTE IMMEDIATE 'CREATE OR REPLACE DIRECTORY BACKUP_DIR AS ''/backup'''; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+BEGIN EXECUTE IMMEDIATE 'GRANT READ, WRITE ON DIRECTORY BACKUP_DIR TO system'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+BEGIN EXECUTE IMMEDIATE 'GRANT READ, WRITE ON DIRECTORY BACKUP_DIR TO C##ADMIN_PHANHE1'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
 
 -- =================================================================
 -- BACKUP && RESTORE: DATA PUMP
@@ -1042,7 +963,7 @@ GRANT READ, WRITE ON DIRECTORY BACKUP_DIR TO ADMIN_PHANHE1;
 
 
 
-CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_BACKUP_DATAPUMP 
+CREATE OR REPLACE PROCEDURE C##ADMIN_PHANHE1.SP_BACKUP_DATAPUMP 
 AUTHID CURRENT_USER 
 IS
     v_dp_handle NUMBER;
@@ -1074,7 +995,7 @@ BEGIN
     DBMS_DATAPUMP.METADATA_FILTER(
         handle => v_dp_handle,
         name   => 'SCHEMA_EXPR',
-        value  => 'IN (''ADMIN_PHANHE1'')'
+        value  => 'IN (''C##ADMIN_PHANHE1'')'
     );
 
     DBMS_DATAPUMP.START_JOB(v_dp_handle);
@@ -1089,7 +1010,7 @@ END SP_BACKUP_DATAPUMP;
 /
 
 
-CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_RESTORE_DATAPUMP (
+CREATE OR REPLACE PROCEDURE C##ADMIN_PHANHE1.SP_RESTORE_DATAPUMP (
     p_filename   IN VARCHAR2, -- BẮT BUỘC: Nhận tên file do WinForm gửi xuống
     p_table_name IN VARCHAR2 DEFAULT NULL 
 ) 
@@ -1114,13 +1035,13 @@ BEGIN
         DBMS_DATAPUMP.METADATA_FILTER(
             handle => v_dp_handle,
             name   => 'NAME_EXPR',
-            value  => 'IN (''' || UPPER(REPLACE(p_table_name, 'ADMIN_PHANHE1.', '')) || ''')'
+            value  => 'IN (''' || UPPER(REPLACE(p_table_name, 'C##ADMIN_PHANHE1.', '')) || ''')'
         );
     ELSE
         DBMS_DATAPUMP.METADATA_FILTER(
             handle => v_dp_handle,
             name   => 'SCHEMA_EXPR',
-            value  => 'IN (''ADMIN_PHANHE1'')'
+            value  => 'IN (''C##ADMIN_PHANHE1'')'
         );
     END IF;
 
@@ -1152,7 +1073,7 @@ BEGIN
     DBMS_SCHEDULER.CREATE_JOB (
         job_name        => 'JOB_DAILY_BACKUP',
         job_type        => 'STORED_PROCEDURE',
-        job_action      => 'ADMIN_PHANHE1.SP_BACKUP_DATAPUMP',
+        job_action      => 'C##ADMIN_PHANHE1.SP_BACKUP_DATAPUMP',
         
         -- [ĐIỂM SỬA CHỮA]: Gắn mốc thời gian bắt đầu theo giờ Việt Nam
         start_date      => SYSTIMESTAMP AT TIME ZONE 'Asia/Ho_Chi_Minh',
@@ -1173,7 +1094,7 @@ END;
 -- CHECK 
 -- SELECT OBJECT_NAME, OBJECT_TYPE, ORACLE_MAINTAINED 
 -- FROM DBA_OBJECTS 
--- WHERE OWNER = 'ADMIN_PHANHE1';
+-- WHERE OWNER = 'C##ADMIN_PHANHE1';
 
 
 
@@ -1183,21 +1104,28 @@ END;
 
 -- CẤP CÁC QUYỀN CẦN THIẾT ĐỂ BACKUP VÀ RESTORE
 -- TẠO VÀ CẤP QUYỀN ĐỂ DÙNG FLASHBACK RESTORE
--- 1. Tao mot kho luu tru ngam ten la FDA_PHANHE1, dung luong toi da 1GB, luu lich su 1 nam
-CREATE FLASHBACK ARCHIVE fda_phanhe1 TABLESPACE USERS QUOTA 1G RETENTION 1 YEAR;
+-- 1. Tao mot kho luu tru ngam ten la FBA_BV_NEW, dung luong toi da 100M, luu lich su 1 nam
+BEGIN EXECUTE IMMEDIATE 'CREATE FLASHBACK ARCHIVE FBA_BV_NEW TABLESPACE USERS QUOTA 100M RETENTION 1 YEAR'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+
 -- 2. Cap quyen cho user do an duoc su dung kho luu tru nay
-GRANT FLASHBACK ARCHIVE ON fda_phanhe1 TO ADMIN_PHANHE1;
+GRANT FLASHBACK ARCHIVE ON FBA_BV_NEW TO C##ADMIN_PHANHE1;
+
 -- 3. Bat che do "Di chuyen dong" (Bat buoc de Flashback hoat dong)
-ALTER TABLE ADMIN_PHANHE1.HSBA ENABLE ROW MOVEMENT;
-ALTER TABLE ADMIN_PHANHE1.HSBA_DV ENABLE ROW MOVEMENT;
-ALTER TABLE ADMIN_PHANHE1.DONTHUOC ENABLE ROW MOVEMENT;
--- 4. Gan kho luu tru FDA vao cac bang de Oracle bat dau ghi log lich su vinh vien
-ALTER TABLE ADMIN_PHANHE1.HSBA FLASHBACK ARCHIVE fda_phanhe1;
-ALTER TABLE ADMIN_PHANHE1.HSBA_DV FLASHBACK ARCHIVE fda_phanhe1;
-ALTER TABLE ADMIN_PHANHE1.DONTHUOC FLASHBACK ARCHIVE fda_phanhe1;
+ALTER TABLE C##ADMIN_PHANHE1.HSBA ENABLE ROW MOVEMENT;
+ALTER TABLE C##ADMIN_PHANHE1.HSBA_DV ENABLE ROW MOVEMENT;
+ALTER TABLE C##ADMIN_PHANHE1.DONTHUOC ENABLE ROW MOVEMENT;
+
+-- 4. Gan kho luu tru FBA vao cac bang de Oracle bat dau ghi log lich su vinh vien
+BEGIN EXECUTE IMMEDIATE 'ALTER TABLE C##ADMIN_PHANHE1.HSBA FLASHBACK ARCHIVE FBA_BV_NEW'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+BEGIN EXECUTE IMMEDIATE 'ALTER TABLE C##ADMIN_PHANHE1.HSBA_DV FLASHBACK ARCHIVE FBA_BV_NEW'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+BEGIN EXECUTE IMMEDIATE 'ALTER TABLE C##ADMIN_PHANHE1.DONTHUOC FLASHBACK ARCHIVE FBA_BV_NEW'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
 
 
-CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_RESTORE_FLASHBACK (
+CREATE OR REPLACE PROCEDURE C##ADMIN_PHANHE1.SP_RESTORE_FLASHBACK (
     p_table_name IN VARCHAR2,
     p_safe_time  IN VARCHAR2 
 )
@@ -1206,7 +1134,7 @@ IS
     v_sql_query VARCHAR2(1000);
 BEGIN
     -- Chỉ cho phép khôi phục những bảng nằm trong danh sách Audit (Bảo mật 2 lớp)
-    IF UPPER(p_table_name) NOT IN ('ADMIN_PHANHE1.HSBA', 'ADMIN_PHANHE1.HSBA_DV', 'ADMIN_PHANHE1.DONTHUOC') THEN
+    IF UPPER(p_table_name) NOT IN ('C##ADMIN_PHANHE1.HSBA', 'C##ADMIN_PHANHE1.HSBA_DV', 'C##ADMIN_PHANHE1.DONTHUOC') THEN
         RAISE_APPLICATION_ERROR(-20001, 'Bao mat: Chi duoc phep khoi phuc cac bang nam trong dien Kiem toan!');
     END IF;
 
@@ -1226,6 +1154,398 @@ END SP_RESTORE_FLASHBACK;
 -- =================================================================
 -- BACKUP && RESTORE (END)
 -- =================================================================
+-- ============================================================
+-- BƯỚC 0: XÓA POLICY CŨ (chạy trước để tránh lỗi khi tạo lại)
+-- ============================================================
+
+
+
+-- ============================================================
+-- BƯỚC 1: SỬA GRANT (bổ sung SELECT còn thiếu)
+-- ============================================================
+ALTER SESSION SET "_ORACLE_SCRIPT" = true;
+CREATE ROLE ROLE_DIEU_PHOI_VIEN;
+CREATE ROLE ROLE_BAC_SI;
+ALTER SESSION SET "_ORACLE_SCRIPT" = false;
+
+GRANT SELECT, INSERT, UPDATE ON C##ADMIN_PHANHE1.BENHNHAN  TO ROLE_DIEU_PHOI_VIEN;
+GRANT SELECT, INSERT         ON C##ADMIN_PHANHE1.HSBA       TO ROLE_DIEU_PHOI_VIEN;
+GRANT UPDATE (MAKHOA, MABS)  ON C##ADMIN_PHANHE1.HSBA       TO ROLE_DIEU_PHOI_VIEN;
+GRANT SELECT                 ON C##ADMIN_PHANHE1.HSBA_DV    TO ROLE_DIEU_PHOI_VIEN; -- bổ sung
+GRANT UPDATE (MAKTV)         ON C##ADMIN_PHANHE1.HSBA_DV    TO ROLE_DIEU_PHOI_VIEN;
+GRANT SELECT                 ON C##ADMIN_PHANHE1.NHANVIEN TO ROLE_DIEU_PHOI_VIEN;
+
+
+GRANT SELECT                              ON C##ADMIN_PHANHE1.HSBA      TO ROLE_BAC_SI;
+GRANT UPDATE (CHANDOAN, DIEUTRI, KETLUAN) ON C##ADMIN_PHANHE1.HSBA      TO ROLE_BAC_SI;
+GRANT SELECT, INSERT, DELETE              ON C##ADMIN_PHANHE1.HSBA_DV   TO ROLE_BAC_SI;
+GRANT SELECT                              ON C##ADMIN_PHANHE1.BENHNHAN  TO ROLE_BAC_SI;
+GRANT UPDATE (TIENSUBENH, TIENSUBENHGD, DIUNGTHUOC) ON C##ADMIN_PHANHE1.BENHNHAN TO ROLE_BAC_SI;
+GRANT SELECT, INSERT, UPDATE, DELETE      ON C##ADMIN_PHANHE1.DONTHUOC  TO ROLE_BAC_SI;
+
+-- ============================================================
+-- BƯỚC 2: HÀM VPD GỘP — 1 hàm cho mỗi bảng, xử lý cả 2 vai trò
+-- ============================================================
+
+-- Bảng HSBA
+CREATE OR REPLACE FUNCTION C##ADMIN_PHANHE1.FN_VPD_HSBA (
+    p_schema IN VARCHAR2,
+    p_table  IN VARCHAR2
+) RETURN VARCHAR2
+AS
+    v_session_user VARCHAR2(128);
+    v_manv   VARCHAR2(20);
+    v_vaitro NVARCHAR2(50);
+BEGIN
+    v_session_user := SYS_CONTEXT('USERENV', 'SESSION_USER');
+
+    IF v_session_user IN ('C##ADMIN_PHANHE1', 'SYS', 'SYSTEM') THEN
+        RETURN '1=1';
+    END IF;
+
+    IF v_session_user NOT LIKE 'C##%' THEN
+        RETURN '1=2';
+    END IF;
+
+    v_manv := SUBSTR(v_session_user, 4);
+
+    SELECT VAITRO INTO v_vaitro
+    FROM C##ADMIN_PHANHE1.NHANVIEN
+    WHERE MANV = v_manv;
+
+    IF v_vaitro = N'Bác sĩ/Y sĩ' THEN
+        -- Bác sĩ chỉ thấy HSBA mình phụ trách
+        RETURN 'MABS = ''' || v_manv || '''';
+    END IF;
+
+    IF v_vaitro = N'Điều phối viên' THEN
+        -- Điều phối viên thấy tất cả HSBA
+        RETURN '1=1';
+    END IF;
+
+    -- Vai trò khác không liên quan policy này
+    RETURN '1=2';
+
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN RETURN '1=2';
+END;
+/
+
+-- Bảng BENHNHAN
+CREATE OR REPLACE FUNCTION C##ADMIN_PHANHE1.FN_VPD_BENHNHAN (
+    p_schema IN VARCHAR2,
+    p_table  IN VARCHAR2
+) RETURN VARCHAR2
+AS
+    v_session_user VARCHAR2(128);
+    v_manv   VARCHAR2(20);
+    v_vaitro NVARCHAR2(50);
+BEGIN
+    v_session_user := SYS_CONTEXT('USERENV', 'SESSION_USER');
+
+    IF v_session_user IN ('C##ADMIN_PHANHE1', 'SYS', 'SYSTEM') THEN
+        RETURN '1=1';
+    END IF;
+
+    IF v_session_user NOT LIKE 'C##%' THEN
+        RETURN '1=2';
+    END IF;
+
+    v_manv := SUBSTR(v_session_user, 4);
+
+    SELECT VAITRO INTO v_vaitro
+    FROM C##ADMIN_PHANHE1.NHANVIEN
+    WHERE MANV = v_manv;
+
+    IF v_vaitro = N'Bác sĩ/Y sĩ' THEN
+        -- Bác sĩ chỉ thấy BN thuộc HSBA mình điều trị
+        RETURN 'MABN IN (SELECT MABN FROM C##ADMIN_PHANHE1.HSBA WHERE MABS = ''' || v_manv || ''')';
+    END IF;
+
+    IF v_vaitro = N'Điều phối viên' THEN
+        -- Điều phối viên thấy tất cả bệnh nhân
+        RETURN '1=1';
+    END IF;
+
+    RETURN '1=2';
+
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN RETURN '1=2';
+END;
+/
+
+-- Bảng HSBA_DV
+CREATE OR REPLACE FUNCTION C##ADMIN_PHANHE1.FN_VPD_HSBA_DV (
+    p_schema IN VARCHAR2,
+    p_table  IN VARCHAR2
+) RETURN VARCHAR2
+AS
+    v_session_user VARCHAR2(128);
+    v_manv   VARCHAR2(20);
+    v_vaitro NVARCHAR2(50);
+BEGIN
+    v_session_user := SYS_CONTEXT('USERENV', 'SESSION_USER');
+
+    IF v_session_user IN ('C##ADMIN_PHANHE1', 'SYS', 'SYSTEM') THEN
+        RETURN '1=1';
+    END IF;
+
+    IF v_session_user NOT LIKE 'C##%' THEN
+        RETURN '1=2';
+    END IF;
+
+    v_manv := SUBSTR(v_session_user, 4);
+
+    SELECT VAITRO INTO v_vaitro
+    FROM C##ADMIN_PHANHE1.NHANVIEN
+    WHERE MANV = v_manv;
+
+    IF v_vaitro = N'Bác sĩ/Y sĩ' THEN
+        -- Bác sĩ chỉ thấy DV thuộc HSBA mình phụ trách
+        RETURN 'MAHSBA IN (SELECT MAHSBA FROM C##ADMIN_PHANHE1.HSBA WHERE MABS = ''' || v_manv || ''')';
+    END IF;
+
+    IF v_vaitro = N'Điều phối viên' THEN
+        -- Điều phối viên chỉ thấy DV thuộc HSBA đã có bác sĩ (để điều phối KTV)
+        RETURN 'MAHSBA IN (SELECT MAHSBA FROM C##ADMIN_PHANHE1.HSBA WHERE MABS IS NOT NULL)';
+    END IF;
+
+    IF v_vaitro = N'Kỹ thuật viên' THEN
+        -- Kỹ thuật viên chỉ thấy DV được phân công cho mình
+        RETURN 'MAKTV = ''' || v_manv || '''';
+    END IF;
+
+    RETURN '1=2';
+
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN RETURN '1=2';
+END;
+/
+
+-- Bảng DONTHUOC
+CREATE OR REPLACE FUNCTION C##ADMIN_PHANHE1.FN_VPD_DONTHUOC (
+    p_schema IN VARCHAR2,
+    p_table  IN VARCHAR2
+) RETURN VARCHAR2
+AS
+    v_session_user VARCHAR2(128);
+    v_manv   VARCHAR2(20);
+    v_vaitro NVARCHAR2(50);
+BEGIN
+    v_session_user := SYS_CONTEXT('USERENV', 'SESSION_USER');
+
+    IF v_session_user IN ('C##ADMIN_PHANHE1', 'SYS', 'SYSTEM') THEN
+        RETURN '1=1';
+    END IF;
+
+    IF v_session_user NOT LIKE 'C##%' THEN
+        RETURN '1=2';
+    END IF;
+
+    v_manv := SUBSTR(v_session_user, 4);
+
+    SELECT VAITRO INTO v_vaitro
+    FROM C##ADMIN_PHANHE1.NHANVIEN
+    WHERE MANV = v_manv;
+
+    IF v_vaitro = N'Bác sĩ/Y sĩ' THEN
+        RETURN 'MAHSBA IN (SELECT MAHSBA FROM C##ADMIN_PHANHE1.HSBA WHERE MABS = ''' || v_manv || ''')';
+    END IF;
+
+    -- Điều phối viên không truy cập DONTHUOC
+    RETURN '1=2';
+
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN RETURN '1=2';
+END;
+/
+
+-- ============================================================
+-- BƯỚC 3: ĐĂNG KÝ POLICY — mỗi bảng chỉ 1 policy
+-- ============================================================
+
+-- HSBA - tách thành 4 policy riêng
+BEGIN
+    DBMS_RLS.ADD_POLICY(
+        object_schema   => 'C##ADMIN_PHANHE1',
+        object_name     => 'HSBA',
+        policy_name     => 'POL_HSBA_SEL',
+        function_schema => 'C##ADMIN_PHANHE1',
+        policy_function => 'FN_VPD_HSBA',
+        statement_types => 'SELECT',
+        enable          => TRUE
+    );
+END;
+/
+BEGIN
+    DBMS_RLS.ADD_POLICY(
+        object_schema   => 'C##ADMIN_PHANHE1',
+        object_name     => 'HSBA',
+        policy_name     => 'POL_HSBA_INS',
+        function_schema => 'C##ADMIN_PHANHE1',
+        policy_function => 'FN_VPD_HSBA',
+        statement_types => 'INSERT',
+        enable          => TRUE,
+        update_check    => TRUE 
+    );
+END;
+/
+BEGIN
+    DBMS_RLS.ADD_POLICY(
+        object_schema   => 'C##ADMIN_PHANHE1',
+        object_name     => 'HSBA',
+        policy_name     => 'POL_HSBA_UPD',
+        function_schema => 'C##ADMIN_PHANHE1',
+        policy_function => 'FN_VPD_HSBA',
+        statement_types => 'UPDATE',
+        enable          => TRUE
+    );
+END;
+/
+BEGIN
+    DBMS_RLS.ADD_POLICY(
+        object_schema   => 'C##ADMIN_PHANHE1',
+        object_name     => 'HSBA',
+        policy_name     => 'POL_HSBA_DEL',
+        function_schema => 'C##ADMIN_PHANHE1',
+        policy_function => 'FN_VPD_HSBA',
+        statement_types => 'DELETE',
+        enable          => TRUE
+    );
+END;
+/
+
+-- BENHNHAN
+BEGIN
+    DBMS_RLS.ADD_POLICY(
+        object_schema   => 'C##ADMIN_PHANHE1',
+        object_name     => 'BENHNHAN',
+        policy_name     => 'POL_BENHNHAN_SEL',
+        function_schema => 'C##ADMIN_PHANHE1',
+        policy_function => 'FN_VPD_BENHNHAN',
+        statement_types => 'SELECT',
+        enable          => TRUE
+    );
+END;
+/
+BEGIN
+    DBMS_RLS.ADD_POLICY(
+        object_schema   => 'C##ADMIN_PHANHE1',
+        object_name     => 'BENHNHAN',
+        policy_name     => 'POL_BENHNHAN_UPD',
+        function_schema => 'C##ADMIN_PHANHE1',
+        policy_function => 'FN_VPD_BENHNHAN',
+        statement_types => 'UPDATE',
+        enable          => TRUE
+    );
+END;
+/
+
+-- HSBA_DV
+BEGIN
+    DBMS_RLS.ADD_POLICY(
+        object_schema   => 'C##ADMIN_PHANHE1',
+        object_name     => 'HSBA_DV',
+        policy_name     => 'POL_HSBADV_SEL',
+        function_schema => 'C##ADMIN_PHANHE1',
+        policy_function => 'FN_VPD_HSBA_DV',
+        statement_types => 'SELECT',
+        enable          => TRUE
+    );
+END;
+/
+BEGIN
+    DBMS_RLS.ADD_POLICY(
+        object_schema   => 'C##ADMIN_PHANHE1',
+        object_name     => 'HSBA_DV',
+        policy_name     => 'POL_HSBADV_INS',
+        function_schema => 'C##ADMIN_PHANHE1',
+        policy_function => 'FN_VPD_HSBA_DV',
+        statement_types => 'INSERT',
+        enable          => TRUE,
+        update_check    => TRUE
+    );
+END;
+/
+BEGIN
+    DBMS_RLS.ADD_POLICY(
+        object_schema   => 'C##ADMIN_PHANHE1',
+        object_name     => 'HSBA_DV',
+        policy_name     => 'POL_HSBADV_UPD',
+        function_schema => 'C##ADMIN_PHANHE1',
+        policy_function => 'FN_VPD_HSBA_DV',
+        statement_types => 'UPDATE',
+        enable          => TRUE
+    );
+END;
+/
+BEGIN
+    DBMS_RLS.ADD_POLICY(
+        object_schema   => 'C##ADMIN_PHANHE1',
+        object_name     => 'HSBA_DV',
+        policy_name     => 'POL_HSBADV_DEL',
+        function_schema => 'C##ADMIN_PHANHE1',
+        policy_function => 'FN_VPD_HSBA_DV',
+        statement_types => 'DELETE',
+        enable          => TRUE
+    );
+END;
+/
+
+-- DONTHUOC
+BEGIN
+    DBMS_RLS.ADD_POLICY(
+        object_schema   => 'C##ADMIN_PHANHE1',
+        object_name     => 'DONTHUOC',
+        policy_name     => 'POL_DONTHUOC_SEL',
+        function_schema => 'C##ADMIN_PHANHE1',
+        policy_function => 'FN_VPD_DONTHUOC',
+        statement_types => 'SELECT',
+        enable          => TRUE
+    );
+END;
+/
+BEGIN
+    DBMS_RLS.ADD_POLICY(
+        object_schema   => 'C##ADMIN_PHANHE1',
+        object_name     => 'DONTHUOC',
+        policy_name     => 'POL_DONTHUOC_INS',
+        function_schema => 'C##ADMIN_PHANHE1',
+        policy_function => 'FN_VPD_DONTHUOC',
+        statement_types => 'INSERT',
+        enable          => TRUE,
+        update_check    => TRUE
+    );
+END;
+/
+BEGIN
+    DBMS_RLS.ADD_POLICY(
+        object_schema   => 'C##ADMIN_PHANHE1',
+        object_name     => 'DONTHUOC',
+        policy_name     => 'POL_DONTHUOC_UPD',
+        function_schema => 'C##ADMIN_PHANHE1',
+        policy_function => 'FN_VPD_DONTHUOC',
+        statement_types => 'UPDATE',
+        enable          => TRUE
+    );
+END;
+/
+BEGIN
+    DBMS_RLS.ADD_POLICY(
+        object_schema   => 'C##ADMIN_PHANHE1',
+        object_name     => 'DONTHUOC',
+        policy_name     => 'POL_DONTHUOC_DEL',
+        function_schema => 'C##ADMIN_PHANHE1',
+        policy_function => 'FN_VPD_DONTHUOC',
+        statement_types => 'DELETE',
+        enable          => TRUE
+    );
+END;
+/
+
+-- =====================================================================
+-- VDP (END)
+-- =====================================================================
 
 
 
@@ -1235,21 +1555,12 @@ END SP_RESTORE_FLASHBACK;
 -- AUDIT (START)
 -- =====================================================================
 
-SELECT object_name,
-       policy_name,
-       enabled,
-       policy_text
-FROM dba_audit_policies
-WHERE object_name = 'HSBA_DV';
+GRANT SELECT ON SYS.DBA_AUDIT_TRAIL TO C##ADMIN_PHANHE1;
+GRANT SELECT ON SYS.DBA_FGA_AUDIT_TRAIL TO C##ADMIN_PHANHE1;
 
+-- CHỈ CẦN 1 TRANG ĐỂ SELECT * FROM VIEW C##ADMIN_PHANHE1.V_ALL_AUDIT_LOG ĐỂ XEM TẤT CẢ CÁC LOGS
 
-
-GRANT SELECT ON SYS.DBA_AUDIT_TRAIL TO ADMIN_PHANHE1;
-GRANT SELECT ON SYS.DBA_FGA_AUDIT_TRAIL TO ADMIN_PHANHE1;
-
--- CHỈ CẦN 1 TRANG ĐỂ SELECT * FROM VIEW ADMIN_PHANHE1.V_ALL_AUDIT_LOG ĐỂ XEM TẤT CẢ CÁC LOGS
-
-CREATE OR REPLACE VIEW ADMIN_PHANHE1.V_ALL_AUDIT_LOG AS
+CREATE OR REPLACE VIEW C##ADMIN_PHANHE1.V_ALL_AUDIT_LOG AS
 SELECT 
     "LOAI_AUDIT",
     "NGUOI_DUNG",
@@ -1313,14 +1624,9 @@ ORDER BY RAW_TIME DESC;
 -- CÀI ĐẶT TÌNH HUỐNG STANDARD AUDIT
 -- =====================================================================
 
--- xem cấu hình audit hiện tại có DB_EXTENDED chưa, chưa thì đổi bằng dòng ALTER bên dưới
-SHOW PARAMETER audit_trail;
-
--- Nếu audit_trail chưa được bật hoặc không phải là DB hoặc DB, EXTENDED thì cần bật bằng câu lệnh sau:
-ALTER SYSTEM SET audit_trail = DB, EXTENDED SCOPE = SPFILE;
--- Cần tắt và khởi động lại database để thay đổi có hiệu lực:
--- SHUTDOWN IMMEDIATE;
--- STARTUP;
+-- Lệnh này gây lỗi ORA-65040 nếu chạy trong PDB nên được comment.
+-- Nếu hệ thống chưa bật Audit thì bắt buộc phải chạy ở CDB$ROOT
+-- ALTER SYSTEM SET audit_trail = DB, EXTENDED SCOPE = SPFILE;
 
 -- =====================================================================
 -- NGỮ CẢNH 1: Giám sát Hệ thống - Đăng nhập thất bại (Session)
@@ -1333,28 +1639,20 @@ AUDIT SESSION WHENEVER NOT SUCCESSFUL;
 -- Ý nghĩa: Bảng HSBA là dữ liệu cốt lõi. Giám sát mọi hành vi Thêm/Xóa/Sửa 
 -- (cả thành công lẫn thất bại) trên bảng này.
 -- =====================================================================
-AUDIT INSERT, UPDATE, DELETE ON ADMIN_PHANHE1.HSBA BY ACCESS;
+AUDIT INSERT, UPDATE, DELETE ON C##ADMIN_PHANHE1.HSBA BY ACCESS;
 
 -- =====================================================================
 -- NGỮ CẢNH 3: Giám sát View - Truy xuất dữ liệu nhạy cảm
--- Ý nghĩa: Giám sát hành vi truy vấn (SELECT) trên View hồ sơ bệnh án 
--- (Giả sử bạn có 1 view tên là V_HSBA_BACSI để bác sĩ xem hồ sơ).
--- Ghi log mỗi khi có người đọc dữ liệu này.
 -- =====================================================================
--- Lưu ý: Đổi 'V_HSBA_BACSI' thành tên View thực tế của nhóm.
 AUDIT SELECT ON V_ALL_AUDIT_LOG BY ACCESS;
 
 -- =====================================================================
 -- NGỮ CẢNH 4: Giám sát Stored Procedure
--- Ý nghĩa: Giám sát việc thực thi các thủ tục có tính rủi ro cao. 
--- Ví dụ: Giám sát xem ai đã chạy thủ tục tạo hồ sơ bệnh án mới.
 -- =====================================================================
--- Lưu ý: Đổi 'SP_TAO_HSBA' thành tên Procedure thực tế của nhóm.
-AUDIT EXECUTE ON ADMIN_PHANHE1.SP_RESTORE_FLASHBACK BY ACCESS;
+AUDIT EXECUTE ON C##ADMIN_PHANHE1.SP_RESTORE_FLASHBACK BY ACCESS;
 
 -- =====================================================================
 -- NGỮ CẢNH 5: Giám sát Cấu trúc (DDL) - Bảo vệ Schema
--- Ý nghĩa: Phát hiện các hành vi cố tình thay đổi cấu trúc bảng (CREATE, ALTER, DROP, TRUNCATE) 
 -- =====================================================================
 AUDIT TABLE BY ACCESS;
 
@@ -1364,18 +1662,18 @@ AUDIT TABLE BY ACCESS;
 -- =====================================================================
 BEGIN
     -- Xóa trên bảng DONTHUOC
-    BEGIN DBMS_FGA.DROP_POLICY('ADMIN_PHANHE1', 'DONTHUOC', 'FGA_DONTHUOC_CAPNHAT_SAUDINH'); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DBMS_FGA.DROP_POLICY('C##ADMIN_PHANHE1', 'DONTHUOC', 'FGA_DONTHUOC_CAPNHAT_SAUDINH'); EXCEPTION WHEN OTHERS THEN NULL; END;
     
     -- Xóa trên bảng HSBA
-    BEGIN DBMS_FGA.DROP_POLICY('ADMIN_PHANHE1', 'HSBA', 'FGA_HSBA_CAPNHAT_HOPPHAP'); EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DBMS_FGA.DROP_POLICY('ADMIN_PHANHE1', 'HSBA', 'FGA_HSBA_CAPNHAT_BATHOPPHAP'); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DBMS_FGA.DROP_POLICY('C##ADMIN_PHANHE1', 'HSBA', 'FGA_HSBA_CAPNHAT_HOPPHAP'); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DBMS_FGA.DROP_POLICY('C##ADMIN_PHANHE1', 'HSBA', 'FGA_HSBA_CAPNHAT_BATHOPPHAP'); EXCEPTION WHEN OTHERS THEN NULL; END;
     
     -- Xóa trên bảng HSBA_DV
-    BEGIN DBMS_FGA.DROP_POLICY('ADMIN_PHANHE1', 'HSBA_DV', 'FGA_HSBADV_INS_DEL_BATHOPPHAP'); EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DBMS_FGA.DROP_POLICY('ADMIN_PHANHE1', 'HSBA_DV', 'FGA_HSBADV_UPD_COT_CAM_BATHOPPHAP'); EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DBMS_FGA.DROP_POLICY('ADMIN_PHANHE1', 'HSBA_DV', 'FGA_HSBADV_UPD_MAKTV_BATHOPPHAP'); EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DBMS_FGA.DROP_POLICY('ADMIN_PHANHE1', 'HSBA_DV', 'FGA_HSBADV_UPD_KETQUA_BATHOPPHAP'); EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DBMS_FGA.DROP_POLICY('ADMIN_PHANHE1', 'HSBA_DV', 'FGA_HSBADV_KTV_CAPNHAT_HOPPHAP'); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DBMS_FGA.DROP_POLICY('C##ADMIN_PHANHE1', 'HSBA_DV', 'FGA_HSBADV_INS_DEL_BATHOPPHAP'); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DBMS_FGA.DROP_POLICY('C##ADMIN_PHANHE1', 'HSBA_DV', 'FGA_HSBADV_UPD_COT_CAM_BATHOPPHAP'); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DBMS_FGA.DROP_POLICY('C##ADMIN_PHANHE1', 'HSBA_DV', 'FGA_HSBADV_UPD_MAKTV_BATHOPPHAP'); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DBMS_FGA.DROP_POLICY('C##ADMIN_PHANHE1', 'HSBA_DV', 'FGA_HSBADV_UPD_KETQUA_BATHOPPHAP'); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DBMS_FGA.DROP_POLICY('C##ADMIN_PHANHE1', 'HSBA_DV', 'FGA_HSBADV_KTV_CAPNHAT_HOPPHAP'); EXCEPTION WHEN OTHERS THEN NULL; END;
 END;
 /
 
@@ -1384,13 +1682,13 @@ END;
 -- =====================================================================
 
 -- 1. Hàm cho 3a (Bảng DONTHUOC)
-CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_DONTHUOC_SAUDINH(p_MAHSBA VARCHAR2) RETURN VARCHAR2 AS
+CREATE OR REPLACE FUNCTION C##ADMIN_PHANHE1.FN_FGA_DONTHUOC_SAUDINH(p_MAHSBA VARCHAR2) RETURN VARCHAR2 AS
     v_is_bs VARCHAR2(10);
     v_count NUMBER;
 BEGIN
-    v_is_bs := SYS_CONTEXT('SYS_SESSION_ROLES', 'ROLE_YSI_BACSI');
+    v_is_bs := SYS_CONTEXT('SYS_SESSION_ROLES', 'ROLE_BAC_SI');
     -- Dùng Subquery trong PL/SQL thì vô tư, không bị FGA cấm
-    SELECT COUNT(*) INTO v_count FROM ADMIN_PHANHE1.HSBA 
+    SELECT COUNT(*) INTO v_count FROM C##ADMIN_PHANHE1.HSBA 
     WHERE MAHSBA = p_MAHSBA AND 'C##' || UPPER(MABS) = SYS_CONTEXT('USERENV', 'SESSION_USER');
     
     IF v_is_bs = 'TRUE' AND v_count > 0 THEN RETURN 'TRUE'; ELSE RETURN 'FALSE'; END IF;
@@ -1398,9 +1696,9 @@ EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
 /
 
 -- 2. Hàm cho 3b (Bảng HSBA - Hợp pháp)
-CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_HSBA_HOPPHAP(p_MABS VARCHAR2) RETURN VARCHAR2 AS
+CREATE OR REPLACE FUNCTION C##ADMIN_PHANHE1.FN_FGA_HSBA_HOPPHAP(p_MABS VARCHAR2) RETURN VARCHAR2 AS
 BEGIN
-    IF SYS_CONTEXT('SYS_SESSION_ROLES', 'ROLE_YSI_BACSI') = 'TRUE' AND 
+    IF SYS_CONTEXT('SYS_SESSION_ROLES', 'ROLE_BAC_SI') = 'TRUE' AND 
        SYS_CONTEXT('USERENV', 'SESSION_USER') = 'C##' || UPPER(p_MABS) THEN
         RETURN 'TRUE';
     ELSE RETURN 'FALSE'; END IF;
@@ -1408,35 +1706,35 @@ EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
 /
 
 -- 3. Hàm cho 3c (Bảng HSBA - Bất hợp pháp)
-CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_HSBA_BATHOPPHAP(p_MABS VARCHAR2) RETURN VARCHAR2 AS
+CREATE OR REPLACE FUNCTION C##ADMIN_PHANHE1.FN_FGA_HSBA_BATHOPPHAP(p_MABS VARCHAR2) RETURN VARCHAR2 AS
 BEGIN
     IF SYS_CONTEXT('USERENV', 'SESSION_USER') != 'C##' || UPPER(p_MABS) THEN RETURN 'TRUE'; ELSE RETURN 'FALSE'; END IF;
 EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
 /
 
 -- 4. Hàm cho 3d.1 (Bảng HSBA_DV - Kiểm tra KHÔNG phải Bác sĩ)
-CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_NOT_BACSI RETURN VARCHAR2 AS
+CREATE OR REPLACE FUNCTION C##ADMIN_PHANHE1.FN_FGA_NOT_BACSI RETURN VARCHAR2 AS
 BEGIN
-    IF SYS_CONTEXT('SYS_SESSION_ROLES', 'ROLE_YSI_BACSI') = 'FALSE' THEN RETURN 'TRUE'; ELSE RETURN 'FALSE'; END IF;
+    IF SYS_CONTEXT('SYS_SESSION_ROLES', 'ROLE_BAC_SI') = 'FALSE' THEN RETURN 'TRUE'; ELSE RETURN 'FALSE'; END IF;
 EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
 /
 
 -- 5. Hàm cho 3d.3 (Bảng HSBA_DV - Kiểm tra KHÔNG phải Điều phối viên)
-CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_NOT_DPV RETURN VARCHAR2 AS
+CREATE OR REPLACE FUNCTION C##ADMIN_PHANHE1.FN_FGA_NOT_DPV RETURN VARCHAR2 AS
 BEGIN
-    IF SYS_CONTEXT('SYS_SESSION_ROLES', 'ROLE_DIEUPHOIVIEN') = 'FALSE' THEN RETURN 'TRUE'; ELSE RETURN 'FALSE'; END IF;
+    IF SYS_CONTEXT('SYS_SESSION_ROLES', 'ROLE_DIEU_PHOI_VIEN') = 'FALSE' THEN RETURN 'TRUE'; ELSE RETURN 'FALSE'; END IF;
 EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
 /
 
 -- 6. Hàm cho 3d.4 (Bảng HSBA_DV - Kiểm tra KHÔNG phải KTV phụ trách)
-CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_NOT_KTV_CHINHLU(p_MAKTV VARCHAR2) RETURN VARCHAR2 AS
+CREATE OR REPLACE FUNCTION C##ADMIN_PHANHE1.FN_FGA_NOT_KTV_CHINHLU(p_MAKTV VARCHAR2) RETURN VARCHAR2 AS
 BEGIN
     IF SYS_CONTEXT('USERENV', 'SESSION_USER') != 'C##' || UPPER(p_MAKTV) THEN RETURN 'TRUE'; ELSE RETURN 'FALSE'; END IF;
 EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
 /
 
 -- 7. Hàm cho 3d.5 (Bảng HSBA_DV - Kiểm tra KTV Hợp pháp)
-CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_KTV_HOPPHAP(p_MAKTV VARCHAR2) RETURN VARCHAR2 AS
+CREATE OR REPLACE FUNCTION C##ADMIN_PHANHE1.FN_FGA_KTV_HOPPHAP(p_MAKTV VARCHAR2) RETURN VARCHAR2 AS
 BEGIN
     IF SYS_CONTEXT('SYS_SESSION_ROLES', 'ROLE_KYTHUATVIEN') = 'TRUE' AND 
        SYS_CONTEXT('USERENV', 'SESSION_USER') = 'C##' || UPPER(p_MAKTV) THEN
@@ -1449,47 +1747,47 @@ EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
 BEGIN
     -- 3a. Giám sát Bác sĩ cập nhật ĐƠN THUỐC sau khi đã chỉ định
     DBMS_FGA.ADD_POLICY(
-        object_schema   => 'ADMIN_PHANHE1',
+        object_schema   => 'C##ADMIN_PHANHE1',
         object_name     => 'DONTHUOC',
         policy_name     => 'FGA_DONTHUOC_CAPNHAT_SAUDINH',
         audit_column    => 'MAHSBA, NGAYDT, TENTHUOC, LIEUDUNG',
-        audit_condition => 'ADMIN_PHANHE1.FN_FGA_DONTHUOC_SAUDINH(MAHSBA) = ''TRUE''',
+        audit_condition => 'C##ADMIN_PHANHE1.FN_FGA_DONTHUOC_SAUDINH(MAHSBA) = ''TRUE''',
         statement_types => 'UPDATE'
     );
 
     -- 3b. Giám sát hành vi Bác sĩ cập nhật HỢP PHÁP trên HSBA
     DBMS_FGA.ADD_POLICY(
-        object_schema   => 'ADMIN_PHANHE1',
+        object_schema   => 'C##ADMIN_PHANHE1',
         object_name     => 'HSBA',
         policy_name     => 'FGA_HSBA_CAPNHAT_HOPPHAP',
         audit_column    => 'CHANDOAN, DIEUTRI, KETLUAN',
-        audit_condition => 'ADMIN_PHANHE1.FN_FGA_HSBA_HOPPHAP(MABS) = ''TRUE''',
+        audit_condition => 'C##ADMIN_PHANHE1.FN_FGA_HSBA_HOPPHAP(MABS) = ''TRUE''',
         statement_types => 'UPDATE'
     );
 
     -- 3c. Giám sát hành vi cập nhật BẤT HỢP PHÁP trên HSBA
     DBMS_FGA.ADD_POLICY(
-        object_schema   => 'ADMIN_PHANHE1',
+        object_schema   => 'C##ADMIN_PHANHE1',
         object_name     => 'HSBA',
         policy_name     => 'FGA_HSBA_CAPNHAT_BATHOPPHAP',
         audit_column    => 'CHANDOAN, DIEUTRI, KETLUAN',
-        audit_condition => 'ADMIN_PHANHE1.FN_FGA_HSBA_BATHOPPHAP(MABS) = ''TRUE''',
+        audit_condition => 'C##ADMIN_PHANHE1.FN_FGA_HSBA_BATHOPPHAP(MABS) = ''TRUE''',
         statement_types => 'UPDATE'
     );
 
     -- 3d.1. Bắt lỗi INSERT, DELETE bất hợp pháp trên HSBA_DV
     DBMS_FGA.ADD_POLICY(
-        object_schema   => 'ADMIN_PHANHE1',
+        object_schema   => 'C##ADMIN_PHANHE1',
         object_name     => 'HSBA_DV',
         policy_name     => 'FGA_HSBADV_INS_DEL_BATHOPPHAP',
         -- Vì không truyền tham số cột nào vào nên bỏ ngoặc
-        audit_condition => 'ADMIN_PHANHE1.FN_FGA_NOT_BACSI() = ''TRUE''',
+        audit_condition => 'C##ADMIN_PHANHE1.FN_FGA_NOT_BACSI() = ''TRUE''',
         statement_types => 'INSERT, DELETE'
     );
 
     -- 3d.2. Bắt lỗi UPDATE bất hợp pháp lên các cột "Cấm sửa"
     DBMS_FGA.ADD_POLICY(
-        object_schema   => 'ADMIN_PHANHE1',
+        object_schema   => 'C##ADMIN_PHANHE1',
         object_name     => 'HSBA_DV',
         policy_name     => 'FGA_HSBADV_UPD_COT_CAM_BATHOPPHAP',
         audit_column    => 'MAHSBA, LOAIDV, NGAYDV',
@@ -1499,31 +1797,31 @@ BEGIN
 
     -- 3d.3. Bắt lỗi UPDATE bất hợp pháp lên cột MAKTV
     DBMS_FGA.ADD_POLICY(
-        object_schema   => 'ADMIN_PHANHE1',
+        object_schema   => 'C##ADMIN_PHANHE1',
         object_name     => 'HSBA_DV',
         policy_name     => 'FGA_HSBADV_UPD_MAKTV_BATHOPPHAP',
         audit_column    => 'MAKTV',
-        audit_condition => 'ADMIN_PHANHE1.FN_FGA_NOT_DPV() = ''TRUE''',
+        audit_condition => 'C##ADMIN_PHANHE1.FN_FGA_NOT_DPV() = ''TRUE''',
         statement_types => 'UPDATE'
     );
 
     -- 3d.4. Bắt lỗi UPDATE bất hợp pháp lên cột KETQUA
     DBMS_FGA.ADD_POLICY(
-        object_schema   => 'ADMIN_PHANHE1',
+        object_schema   => 'C##ADMIN_PHANHE1',
         object_name     => 'HSBA_DV',
         policy_name     => 'FGA_HSBADV_UPD_KETQUA_BATHOPPHAP',
         audit_column    => 'KETQUA',
-        audit_condition => 'ADMIN_PHANHE1.FN_FGA_NOT_KTV_CHINHLU(MAKTV) = ''TRUE''',
+        audit_condition => 'C##ADMIN_PHANHE1.FN_FGA_NOT_KTV_CHINHLU(MAKTV) = ''TRUE''',
         statement_types => 'UPDATE'
     );
 
     -- 3d.5. KTV cập nhật HỢP PHÁP
     DBMS_FGA.ADD_POLICY(
-        object_schema   => 'ADMIN_PHANHE1',
+        object_schema   => 'C##ADMIN_PHANHE1',
         object_name     => 'HSBA_DV',
         policy_name     => 'FGA_HSBADV_KTV_CAPNHAT_HOPPHAP',
         audit_column    => 'KETQUA',
-        audit_condition => 'ADMIN_PHANHE1.FN_FGA_KTV_HOPPHAP(MAKTV) = ''TRUE''',
+        audit_condition => 'C##ADMIN_PHANHE1.FN_FGA_KTV_HOPPHAP(MAKTV) = ''TRUE''',
         statement_types => 'UPDATE'
     );   
 END;
@@ -1532,3 +1830,315 @@ END;
 -- =====================================================================
 -- AUDIT (END)
 -- =====================================================================
+
+
+-- =================================================================
+-- PHAN HE 2 - TASK 1: RBAC CHO KY THUAT VIEN VA BENH NHAN
+-- =================================================================
+-- Muc tieu:
+-- 1. KTV chi xem cac dong HSBA_DV duoc phan cong cho minh va chi cap nhat KETQUA.
+-- 2. KTV va Benh nhan chi xem/sua thong tin ca nhan cua chinh minh theo cac cot duoc phep.
+-- 3. UI WinForms dang nhap bang user Oracle that va truy cap qua cac view duoc grant theo role.
+
+ALTER SESSION SET "_ORACLE_SCRIPT"=true;
+
+BEGIN
+    EXECUTE IMMEDIATE 'CREATE ROLE ROLE_KYTHUATVIEN';
+EXCEPTION
+    WHEN OTHERS THEN
+        IF SQLCODE != -1921 THEN RAISE; END IF;
+END;
+/
+ALTER SESSION SET "_ORACLE_SCRIPT"=false;
+
+BEGIN
+    EXECUTE IMMEDIATE 'CREATE ROLE ROLE_BENHNHAN';
+EXCEPTION
+    WHEN OTHERS THEN
+        IF SQLCODE != -1921 THEN RAISE; END IF;
+END;
+/
+ALTER SESSION SET "_ORACLE_SCRIPT"=false;
+
+CREATE OR REPLACE VIEW C##ADMIN_PHANHE1.V_RBAC_KTV_THONGTIN AS
+SELECT MANV, HOTEN, PHAI, NGAYSINH, CMND, QUEQUAN, SODT, VAITRO, CHUYENKHOA, COSO
+FROM C##ADMIN_PHANHE1.NHANVIEN
+WHERE 'C##' || UPPER(MANV) = SYS_CONTEXT('USERENV', 'SESSION_USER')
+WITH CHECK OPTION CONSTRAINT CK_V_RBAC_KTV_SELF;
+
+CREATE OR REPLACE VIEW C##ADMIN_PHANHE1.V_RBAC_KTV_DICHVU AS
+SELECT MAHSBA, LOAIDV, NGAYDV, MAKTV, KETQUA
+FROM C##ADMIN_PHANHE1.HSBA_DV
+WHERE 'C##' || UPPER(MAKTV) = SYS_CONTEXT('USERENV', 'SESSION_USER')
+WITH CHECK OPTION CONSTRAINT CK_V_RBAC_KTV_DICHVU;
+
+CREATE OR REPLACE VIEW C##ADMIN_PHANHE1.V_RBAC_BENHNHAN_THONGTIN AS
+SELECT MABN, TENBN, PHAI, NGAYSINH, CCCD, SONHA, TENDUONG, QUANHUYEN, TINHTP,
+       TIENSUBENH, TIENSUBENHGD, DIUNGTHUOC
+FROM C##ADMIN_PHANHE1.BENHNHAN
+WHERE 'C##' || UPPER(MABN) = SYS_CONTEXT('USERENV', 'SESSION_USER')
+WITH CHECK OPTION CONSTRAINT CK_V_RBAC_BENHNHAN_SELF;
+
+GRANT SELECT ON C##ADMIN_PHANHE1.V_RBAC_KTV_THONGTIN TO ROLE_KYTHUATVIEN;
+GRANT UPDATE (QUEQUAN, SODT, COSO) ON C##ADMIN_PHANHE1.V_RBAC_KTV_THONGTIN TO ROLE_KYTHUATVIEN;
+GRANT SELECT ON C##ADMIN_PHANHE1.V_RBAC_KTV_DICHVU TO ROLE_KYTHUATVIEN;
+GRANT UPDATE (KETQUA) ON C##ADMIN_PHANHE1.V_RBAC_KTV_DICHVU TO ROLE_KYTHUATVIEN;
+
+GRANT SELECT ON C##ADMIN_PHANHE1.V_RBAC_BENHNHAN_THONGTIN TO ROLE_BENHNHAN;
+GRANT UPDATE (SONHA, TENDUONG, QUANHUYEN, TINHTP, TIENSUBENH, TIENSUBENHGD, DIUNGTHUOC)
+ON C##ADMIN_PHANHE1.V_RBAC_BENHNHAN_THONGTIN TO ROLE_BENHNHAN;
+
+CREATE OR REPLACE PROCEDURE C##ADMIN_PHANHE1.SP_SYNC_TASK1_RBAC_USERS (
+    p_DEFAULT_PASSWORD IN VARCHAR2 DEFAULT '123456'
+)
+AUTHID CURRENT_USER
+IS
+    v_sql VARCHAR2(1000);
+    v_username VARCHAR2(128);
+    v_count NUMBER;
+
+    PROCEDURE ensure_user(p_username IN VARCHAR2) IS
+        v_safe_username VARCHAR2(128);
+    BEGIN
+        v_safe_username := DBMS_ASSERT.SIMPLE_SQL_NAME(UPPER(TRIM(p_username)));
+        SELECT COUNT(*) INTO v_count FROM DBA_USERS WHERE USERNAME = v_safe_username;
+
+        IF v_count = 0 THEN
+            v_sql := 'CREATE USER ' || v_safe_username ||
+                     ' IDENTIFIED BY "' || REPLACE(p_DEFAULT_PASSWORD, '"', '""') || '"';
+            EXECUTE IMMEDIATE v_sql;
+        END IF;
+
+        EXECUTE IMMEDIATE 'GRANT CREATE SESSION TO ' || v_safe_username;
+    END;
+BEGIN
+    EXECUTE IMMEDIATE 'ALTER SESSION SET "_ORACLE_SCRIPT"=true';
+
+    FOR rec IN (SELECT MANV, VAITRO FROM C##ADMIN_PHANHE1.NHANVIEN)
+    LOOP
+        v_username := 'C##' || UPPER(rec.MANV);
+        ensure_user(v_username);
+
+        IF REGEXP_LIKE(LOWER(rec.VAITRO), 'thu.*t.*vi') THEN
+            EXECUTE IMMEDIATE 'GRANT ROLE_KYTHUATVIEN TO ' || DBMS_ASSERT.SIMPLE_SQL_NAME(v_username);
+        ELSE
+            BEGIN
+                EXECUTE IMMEDIATE 'REVOKE ROLE_KYTHUATVIEN FROM ' || DBMS_ASSERT.SIMPLE_SQL_NAME(v_username);
+            EXCEPTION
+                WHEN OTHERS THEN NULL;
+            END;
+        END IF;
+    END LOOP;
+
+    FOR rec IN (SELECT MABN FROM C##ADMIN_PHANHE1.BENHNHAN)
+    LOOP
+        v_username := 'C##' || UPPER(rec.MABN);
+        ensure_user(v_username);
+        EXECUTE IMMEDIATE 'GRANT ROLE_BENHNHAN TO ' || DBMS_ASSERT.SIMPLE_SQL_NAME(v_username);
+    END LOOP;
+    EXECUTE IMMEDIATE 'ALTER SESSION SET "_ORACLE_SCRIPT"=false';
+END;
+/
+
+BEGIN
+    C##ADMIN_PHANHE1.SP_SYNC_TASK1_RBAC_USERS('123456');
+END;
+/
+
+-- =================================================================
+-- PHAN HE 2 - TASK OLS: OBJECT-LEVEL SECURITY DE PHAT TAN THONG BAO
+-- =================================================================
+-- 0. Cấu hình OLS (Chỉ cần làm 1 lần duy nhất, không cần lặp lại nếu đã làm rồi)
+-- EXEC LBACSYS.CONFIGURE_OLS;
+-- EXEC LBACSYS.OLS_ENFORCEMENT.ENABLE_OLS;
+-- SHUTDOWN IMMEDIATE;
+-- STARTUP;
+-- Hoặc có thể tắt SQL*Plus và khởi động lại database bằng tay để áp dụng cấu hình OLS mới
+-- 1. Đảm bảo đứng đúng Pluggable Database cục bộ
+ALTER SESSION SET CONTAINER = XEPDB1;
+ALTER SESSION SET CURRENT_SCHEMA = SYS;
+
+-- Vá lỗi đặc quyền phân tầng hệ thống
+GRANT INHERIT PRIVILEGES ON USER SYS TO LBACSYS;
+
+-- =====================================================================
+-- BƯỚC 0: DỌN DẸP HỆ THỐNG CŨ
+-- =====================================================================
+ALTER SESSION SET "_ORACLE_SCRIPT" = true;
+
+DECLARE v_count NUMBER;
+BEGIN
+    SELECT COUNT(*) INTO v_count FROM dba_sa_policies WHERE policy_name = 'OLS_BV';
+    IF v_count > 0 THEN
+        BEGIN SA_POLICY_ADMIN.REMOVE_TABLE_POLICY('OLS_BV', 'C##ADMIN_PHANHE1', 'THONGBAO'); EXCEPTION WHEN OTHERS THEN NULL; END;
+        SA_SYSDBA.DROP_POLICY('OLS_BV', TRUE);
+    END IF;
+EXCEPTION WHEN OTHERS THEN NULL;
+END;
+/
+
+BEGIN
+    FOR i IN 1..8 LOOP
+        FOR s IN (SELECT sid, serial# FROM v$session WHERE username = 'U' || i) LOOP
+            EXECUTE IMMEDIATE 'ALTER SYSTEM KILL SESSION ''' || s.sid || ',' || s.serial# || ''' IMMEDIATE';
+        END LOOP;
+        BEGIN EXECUTE IMMEDIATE 'DROP USER U' || i || ' CASCADE'; EXCEPTION WHEN OTHERS THEN NULL; END;
+    END LOOP;
+END;
+/
+
+-- =====================================================================
+-- BƯỚC TIỀN ĐỀ: TẮT CỜ SCRIPT ĐỂ TẠO ĐỐI TƯỢNG LOCAL (SỬA LỖI ORA-42901)
+-- =====================================================================
+ALTER SESSION SET "_ORACLE_SCRIPT" = false;
+
+ALTER USER C##ADMIN_PHANHE1 QUOTA UNLIMITED ON USERS;
+GRANT DBA TO C##ADMIN_PHANHE1;
+
+BEGIN
+    FOR i IN 1..8 LOOP
+        DECLARE
+            v_count NUMBER;
+        BEGIN
+            -- Kiểm tra xem User U1, U2... đã tồn tại hay chưa
+            SELECT COUNT(*) INTO v_count FROM dba_users WHERE username = 'U' || i;
+            
+            IF v_count = 0 THEN
+                -- Nếu chưa có thì tạo mới
+                EXECUTE IMMEDIATE 'CREATE USER U' || i || ' IDENTIFIED BY "User@123"';
+            ELSE
+                -- Nếu lỡ bị kẹt do lần chạy trước, chỉ cần cập nhật lại mật khẩu
+                EXECUTE IMMEDIATE 'ALTER USER U' || i || ' IDENTIFIED BY "User@123"';
+            END IF;
+            
+            -- Cấp quyền đăng nhập
+            EXECUTE IMMEDIATE 'GRANT CREATE SESSION TO U' || i;
+        END;
+    END LOOP;
+END;
+/
+CREATE TABLE C##ADMIN_PHANHE1.THONGBAO (
+    MATB VARCHAR2(20) PRIMARY KEY,
+    NOIDUNG NVARCHAR2(1000),
+    NGAYGIO TIMESTAMP,
+    DIADIEM NVARCHAR2(100)
+);
+GRANT SELECT ON C##ADMIN_PHANHE1.THONGBAO TO U1, U2, U3, U4, U5, U6, U7, U8;
+
+INSERT INTO C##ADMIN_PHANHE1.THONGBAO VALUES ('t1', N'Đây là thông báo gửi đến toàn bộ nhân viên', SYSTIMESTAMP, N'Hội trường A');
+INSERT INTO C##ADMIN_PHANHE1.THONGBAO VALUES ('t2', N'Đây là thông báo gửi đến toàn bộ Ban giám đốc', SYSTIMESTAMP, N'Phòng họp VIP');
+INSERT INTO C##ADMIN_PHANHE1.THONGBAO VALUES ('t3', N'Đây là thông báo gửi đến các lãnh đạo khoa', SYSTIMESTAMP, N'Phòng 201');
+INSERT INTO C##ADMIN_PHANHE1.THONGBAO VALUES ('t4', N'Đây là thông báo gửi đến lãnh đạo Khoa tiêu hóa', SYSTIMESTAMP, N'Phòng Khoa TH');
+INSERT INTO C##ADMIN_PHANHE1.THONGBAO VALUES ('t5', N'Đây là thông báo gửi đến nhân viên Khoa tiêu hóa ở Hồ Chí Minh', SYSTIMESTAMP, N'Cơ sở HCM');
+INSERT INTO C##ADMIN_PHANHE1.THONGBAO VALUES ('t6', N'Đây là thông báo gửi đến nhân viên Khoa tiêu hóa ở Hà Nội', SYSTIMESTAMP, N'Cơ sở HN');
+INSERT INTO C##ADMIN_PHANHE1.THONGBAO VALUES ('t7', N'Đây là thông báo gửi đến lãnh đạo Khoa tiêu hóa và Khoa thần kinh tại Hải Phòng', SYSTIMESTAMP, N'Cơ sở HP');
+COMMIT;
+-- =====================================================================
+-- BƯỚC 2: TẠO POLICY VÀ THÀNH PHẦN OLS
+-- =====================================================================
+EXEC SA_SYSDBA.CREATE_POLICY(policy_name => 'OLS_BV', column_name => 'OLS_LABEL');
+
+-- Levels
+EXEC SA_COMPONENTS.CREATE_LEVEL('OLS_BV', 30, 'GD', 'Ban Giam Doc');
+EXEC SA_COMPONENTS.CREATE_LEVEL('OLS_BV', 20, 'LD', 'Lanh Dao Khoa');
+EXEC SA_COMPONENTS.CREATE_LEVEL('OLS_BV', 10, 'NV', 'Nhan Vien');
+
+-- Compartments
+EXEC SA_COMPONENTS.CREATE_COMPARTMENT('OLS_BV', 100, 'TH', 'Khoa Tieu Hoa');
+EXEC SA_COMPONENTS.CREATE_COMPARTMENT('OLS_BV', 110, 'TK', 'Khoa Than Kinh');
+EXEC SA_COMPONENTS.CREATE_COMPARTMENT('OLS_BV', 120, 'TM', 'Khoa Tim Mach');
+
+-- Groups (SỬA ĐỔI: Chuyển dịch sang mô hình Phân cấp Parent-Child chuẩn)
+EXEC SA_COMPONENTS.CREATE_GROUP('OLS_BV', 100, 'TOAN_VIEN', 'Toan Bo Benh Vien');
+EXEC SA_COMPONENTS.CREATE_GROUP('OLS_BV', 10,  'HCM',       'Co So Ho Chi Minh', 'TOAN_VIEN');
+EXEC SA_COMPONENTS.CREATE_GROUP('OLS_BV', 20,  'HN',        'Co So Ha Noi',      'TOAN_VIEN');
+EXEC SA_COMPONENTS.CREATE_GROUP('OLS_BV', 30,  'HP',        'Co So Hai Phong',   'TOAN_VIEN');
+
+-- =====================================================================
+-- BƯỚC 3: ĐĂNG KÝ DANH SÁCH CHUỖI NHÃN HỢP LỆ
+-- =====================================================================
+EXEC SA_LABEL_ADMIN.CREATE_LABEL('OLS_BV', 1001, 'NV');
+EXEC SA_LABEL_ADMIN.CREATE_LABEL('OLS_BV', 1002, 'GD');
+EXEC SA_LABEL_ADMIN.CREATE_LABEL('OLS_BV', 1003, 'LD');
+EXEC SA_LABEL_ADMIN.CREATE_LABEL('OLS_BV', 1004, 'LD:TH');
+EXEC SA_LABEL_ADMIN.CREATE_LABEL('OLS_BV', 1005, 'NV:TH:HCM');
+EXEC SA_LABEL_ADMIN.CREATE_LABEL('OLS_BV', 1006, 'NV:TH:HN');
+EXEC SA_LABEL_ADMIN.CREATE_LABEL('OLS_BV', 1007, 'LD:TH,TK:HP');
+
+-- =====================================================================
+-- BƯỚC 4: GÁN QUYỀN CHO NGƯỜI DÙNG U1 -> U8 (SỬA ĐỔI: Ăn theo group phân cấp)
+-- =====================================================================
+-- U1: Giám đốc toàn viện
+EXEC SA_USER_ADMIN.SET_LEVELS('OLS_BV', 'U1', 'GD', 'NV', 'GD', 'GD');
+EXEC SA_USER_ADMIN.SET_COMPARTMENTS('OLS_BV', 'U1', 'TH,TK,TM', 'TH,TK,TM', 'TH,TK,TM', 'TH,TK,TM');
+EXEC SA_USER_ADMIN.SET_GROUPS('OLS_BV', 'U1', 'TOAN_VIEN', 'TOAN_VIEN', 'TOAN_VIEN', 'TOAN_VIEN');
+
+-- U2: Lãnh đạo Khoa tim mạch tại Hồ Chí Minh
+EXEC SA_USER_ADMIN.SET_LEVELS('OLS_BV', 'U2', 'LD', 'NV', 'LD', 'LD');
+EXEC SA_USER_ADMIN.SET_COMPARTMENTS('OLS_BV', 'U2', 'TM', 'TM', 'TM', 'TM');
+EXEC SA_USER_ADMIN.SET_GROUPS('OLS_BV', 'U2', 'HCM', 'HCM', 'HCM', 'HCM');
+
+-- U3: Lãnh đạo Khoa thần kinh tại Hà Nội
+EXEC SA_USER_ADMIN.SET_LEVELS('OLS_BV', 'U3', 'LD', 'NV', 'LD', 'LD');
+EXEC SA_USER_ADMIN.SET_COMPARTMENTS('OLS_BV', 'U3', 'TK', 'TK', 'TK', 'TK');
+EXEC SA_USER_ADMIN.SET_GROUPS('OLS_BV', 'U3', 'HN', 'HN', 'HN', 'HN');
+
+-- U4: Nhân viên thuộc Khoa thần kinh tại Hồ Chí Minh
+EXEC SA_USER_ADMIN.SET_LEVELS('OLS_BV', 'U4', 'NV', 'NV', 'NV', 'NV');
+EXEC SA_USER_ADMIN.SET_COMPARTMENTS('OLS_BV', 'U4', 'TK', 'TK', 'TK', 'TK');
+EXEC SA_USER_ADMIN.SET_GROUPS('OLS_BV', 'U4', 'HCM', 'HCM', 'HCM', 'HCM');
+
+-- U5: Nhân viên thuộc Khoa tim mạch tại Hồ Chí Minh
+EXEC SA_USER_ADMIN.SET_LEVELS('OLS_BV', 'U5', 'NV', 'NV', 'NV', 'NV');
+EXEC SA_USER_ADMIN.SET_COMPARTMENTS('OLS_BV', 'U5', 'TM', 'TM', 'TM', 'TM');
+EXEC SA_USER_ADMIN.SET_GROUPS('OLS_BV', 'U5', 'HCM', 'HCM', 'HCM', 'HCM');
+
+-- U6: Lãnh đạo phòng xem thông báo Khoa tim mạch tại HCM
+EXEC SA_USER_ADMIN.SET_LEVELS('OLS_BV', 'U6', 'LD', 'NV', 'LD', 'LD');
+EXEC SA_USER_ADMIN.SET_COMPARTMENTS('OLS_BV', 'U6', 'TM', 'TM', 'TM', 'TM');
+EXEC SA_USER_ADMIN.SET_GROUPS('OLS_BV', 'U6', 'HCM', 'HCM', 'HCM', 'HCM');
+
+-- U7: Lãnh đạo phòng xem toàn bộ thông báo phù hợp cấp bậc
+EXEC SA_USER_ADMIN.SET_LEVELS('OLS_BV', 'U7', 'LD', 'NV', 'LD', 'LD');
+EXEC SA_USER_ADMIN.SET_COMPARTMENTS('OLS_BV', 'U7', 'TH,TK,TM', 'TH,TK,TM', 'TH,TK,TM', 'TH,TK,TM');
+EXEC SA_USER_ADMIN.SET_GROUPS('OLS_BV', 'U7', 'TOAN_VIEN', 'TOAN_VIEN', 'TOAN_VIEN', 'TOAN_VIEN');
+
+-- U8: Nhân viên thuộc Khoa Tiêu hóa tại Hà Nội
+EXEC SA_USER_ADMIN.SET_LEVELS('OLS_BV', 'U8', 'NV', 'NV', 'NV', 'NV');
+EXEC SA_USER_ADMIN.SET_COMPARTMENTS('OLS_BV', 'U8', 'TH', 'TH', 'TH', 'TH');
+EXEC SA_USER_ADMIN.SET_GROUPS('OLS_BV', 'U8', 'HN', 'HN', 'HN', 'HN');
+
+BEGIN
+    SA_POLICY_ADMIN.APPLY_TABLE_POLICY('OLS_BV', 'C##ADMIN_PHANHE1', 'THONGBAO', 'NO_CONTROL');
+END;
+/
+
+UPDATE C##ADMIN_PHANHE1.THONGBAO SET OLS_LABEL = CHAR_TO_LABEL('OLS_BV', 'NV') WHERE MATB = 't1';
+UPDATE C##ADMIN_PHANHE1.THONGBAO SET OLS_LABEL = CHAR_TO_LABEL('OLS_BV', 'GD') WHERE MATB = 't2';
+UPDATE C##ADMIN_PHANHE1.THONGBAO SET OLS_LABEL = CHAR_TO_LABEL('OLS_BV', 'LD') WHERE MATB = 't3';
+UPDATE C##ADMIN_PHANHE1.THONGBAO SET OLS_LABEL = CHAR_TO_LABEL('OLS_BV', 'LD:TH') WHERE MATB = 't4';
+UPDATE C##ADMIN_PHANHE1.THONGBAO SET OLS_LABEL = CHAR_TO_LABEL('OLS_BV', 'NV:TH:HCM') WHERE MATB = 't5';
+UPDATE C##ADMIN_PHANHE1.THONGBAO SET OLS_LABEL = CHAR_TO_LABEL('OLS_BV', 'NV:TH:HN') WHERE MATB = 't6';
+UPDATE C##ADMIN_PHANHE1.THONGBAO SET OLS_LABEL = CHAR_TO_LABEL('OLS_BV', 'LD:TH,TK:HP') WHERE MATB = 't7';
+COMMIT;
+BEGIN
+    SA_POLICY_ADMIN.REMOVE_TABLE_POLICY('OLS_BV', 'C##ADMIN_PHANHE1', 'THONGBAO');
+    SA_POLICY_ADMIN.APPLY_TABLE_POLICY('OLS_BV', 'C##ADMIN_PHANHE1', 'THONGBAO', 'READ_CONTROL,WRITE_CONTROL,CHECK_CONTROL');
+    SA_POLICY_ADMIN.ENABLE_TABLE_POLICY('OLS_BV', 'C##ADMIN_PHANHE1', 'THONGBAO');
+END;
+/
+
+-- ====================================
+-- CẤP ROLE CHO USER
+-- ====================================
+GRANT ROLE_BAC_SI TO C##NV004;
+GRANT ROLE_BAC_SI TO C##NV005;
+GRANT ROLE_BAC_SI TO C##NV006;
+GRANT ROLE_DIEU_PHOI_VIEN TO C##NV008;
+
+
+
+-- SELECT OBJECT_NAME, OBJECT_TYPE, ORACLE_MAINTAINED 
+-- FROM DBA_OBJECTS 
+-- WHERE OWNER = 'C##ADMIN_PHANHE1';
+
