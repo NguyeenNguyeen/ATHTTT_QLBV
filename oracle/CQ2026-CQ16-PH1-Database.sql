@@ -1231,33 +1231,108 @@ BEGIN EXECUTE IMMEDIATE 'ALTER TABLE ADMIN_PHANHE1.HSBA_DV FLASHBACK ARCHIVE FBA
 BEGIN EXECUTE IMMEDIATE 'ALTER TABLE ADMIN_PHANHE1.DONTHUOC FLASHBACK ARCHIVE FBA_BV_NEW'; EXCEPTION WHEN OTHERS THEN NULL; END;
 /
 
+-- 2. Cấp quyền chạy 2 gói hệ thống bảo mật trực tiếp
+GRANT EXECUTE ON DBMS_RLS TO ADMIN_PHANHE1;
+GRANT EXECUTE ON DBMS_FGA TO ADMIN_PHANHE1;
+
+-- 3. Cấp quyền đọc 2 view từ điển chứa thông tin Policy trực tiếp
+GRANT SELECT ON DBA_POLICIES TO ADMIN_PHANHE1;
+GRANT SELECT ON DBA_AUDIT_POLICIES TO ADMIN_PHANHE1;
 
 CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_RESTORE_FLASHBACK (
     p_table_name IN VARCHAR2,
     p_safe_time  IN VARCHAR2 
 )
-AUTHID CURRENT_USER 
+-- Đã xóa AUTHID CURRENT_USER để dùng quyền Definer
 IS
     v_sql_query VARCHAR2(1000);
+    v_raw_table VARCHAR2(100);
 BEGIN
-    -- Chỉ cho phép khôi phục những bảng nằm trong danh sách Audit (Bảo mật 2 lớp)
-    IF UPPER(p_table_name) NOT IN ('ADMIN_PHANHE1.HSBA', 'ADMIN_PHANHE1.HSBA_DV', 'ADMIN_PHANHE1.DONTHUOC') THEN
-        RAISE_APPLICATION_ERROR(-20001, 'Bao mat: Chi duoc phep khoi phuc cac bang nam trong dien Kiem toan!');
+    -- 1. Xử lý chuỗi để lấy tên bảng gốc (Bỏ tiền tố ADMIN_PHANHE1. nếu có)
+    IF INSTR(UPPER(p_table_name), '.') > 0 THEN
+        v_raw_table := SUBSTR(UPPER(p_table_name), INSTR(UPPER(p_table_name), '.') + 1);
+    ELSE
+        v_raw_table := UPPER(p_table_name);
     END IF;
 
-    v_sql_query := 'FLASHBACK TABLE ' || p_table_name || 
+    -- Kiểm tra bảo mật lớp 1
+    IF v_raw_table NOT IN ('HSBA', 'HSBA_DV', 'DONTHUOC') THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Bảo mật: Chỉ được phép khôi phục các bảng thuộc diện Kiểm toán!');
+    END IF;
+
+    DBMS_OUTPUT.PUT_LINE('Đang chuẩn bị khôi phục bảng: ' || v_raw_table);
+
+    -- 2. TẠM TẮT TẤT CẢ VPD POLICIES TRÊN BẢNG NÀY
+    FOR rec IN (SELECT POLICY_NAME FROM DBA_POLICIES WHERE OBJECT_OWNER = 'ADMIN_PHANHE1' AND OBJECT_NAME = v_raw_table) LOOP
+        DBMS_RLS.ENABLE_POLICY('ADMIN_PHANHE1', v_raw_table, rec.policy_name, FALSE);
+    END LOOP;
+
+    -- 3. TẠM TẮT TẤT CẢ FGA POLICIES TRÊN BẢNG NÀY (Đã sửa thành DBA_AUDIT_POLICIES)
+    FOR rec IN (SELECT POLICY_NAME FROM DBA_AUDIT_POLICIES WHERE OBJECT_SCHEMA = 'ADMIN_PHANHE1' AND OBJECT_NAME = v_raw_table) LOOP
+        DBMS_FGA.ENABLE_POLICY('ADMIN_PHANHE1', v_raw_table, rec.policy_name, FALSE);
+    END LOOP;
+
+    -- 4. THỰC HIỆN DU HÀNH THỜI GIAN (FLASHBACK)
+    v_sql_query := 'FLASHBACK TABLE ADMIN_PHANHE1.' || v_raw_table || 
                    ' TO TIMESTAMP TO_TIMESTAMP(''' || p_safe_time || ''', ''YYYY-MM-DD HH24:MI:SS'')';
                    
-    DBMS_OUTPUT.PUT_LINE('Thuc thi lenh: ' || v_sql_query);
+    DBMS_OUTPUT.PUT_LINE('Thực thi lệnh: ' || v_sql_query);
     EXECUTE IMMEDIATE v_sql_query;
-    DBMS_OUTPUT.PUT_LINE('=> Khoi phuc bang ' || p_table_name || ' thanh cong!');
+    DBMS_OUTPUT.PUT_LINE('=> Khôi phục bảng ' || v_raw_table || ' thành công!');
+
+    -- 5. BẬT LẠI VPD VÀ FGA ĐỂ BẢO VỆ BẢNG
+    FOR rec IN (SELECT POLICY_NAME FROM DBA_POLICIES WHERE OBJECT_OWNER = 'ADMIN_PHANHE1' AND OBJECT_NAME = v_raw_table) LOOP
+        DBMS_RLS.ENABLE_POLICY('ADMIN_PHANHE1', v_raw_table, rec.policy_name, TRUE);
+    END LOOP;
+    
+    -- (Đã sửa thành DBA_AUDIT_POLICIES)
+    FOR rec IN (SELECT POLICY_NAME FROM DBA_AUDIT_POLICIES WHERE OBJECT_SCHEMA = 'ADMIN_PHANHE1' AND OBJECT_NAME = v_raw_table) LOOP
+        DBMS_FGA.ENABLE_POLICY('ADMIN_PHANHE1', v_raw_table, rec.policy_name, TRUE);
+    END LOOP;
 
 EXCEPTION
     WHEN OTHERS THEN
-        DBMS_OUTPUT.PUT_LINE('Loi Flashback: ' || SQLERRM);
+        -- Tình huống khẩn cấp: Nếu Flashback thất bại, PHẢI bật lại hệ thống an ninh lập tức
+        FOR rec IN (SELECT POLICY_NAME FROM DBA_POLICIES WHERE OBJECT_OWNER = 'ADMIN_PHANHE1' AND OBJECT_NAME = v_raw_table) LOOP
+            DBMS_RLS.ENABLE_POLICY('ADMIN_PHANHE1', v_raw_table, rec.policy_name, TRUE);
+        END LOOP;
+        
+        -- (Đã sửa thành DBA_AUDIT_POLICIES)
+        FOR rec IN (SELECT POLICY_NAME FROM DBA_AUDIT_POLICIES WHERE OBJECT_SCHEMA = 'ADMIN_PHANHE1' AND OBJECT_NAME = v_raw_table) LOOP
+            DBMS_FGA.ENABLE_POLICY('ADMIN_PHANHE1', v_raw_table, rec.policy_name, TRUE);
+        END LOOP;
+        
+        DBMS_OUTPUT.PUT_LINE('Lỗi Flashback: ' || SQLERRM);
         RAISE; 
 END SP_RESTORE_FLASHBACK;
 /
+--
+--CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_RESTORE_FLASHBACK (
+--    p_table_name IN VARCHAR2,
+--    p_safe_time  IN VARCHAR2 
+--)
+--AUTHID CURRENT_USER 
+--IS
+--    v_sql_query VARCHAR2(1000);
+--BEGIN
+--    -- Chỉ cho phép khôi phục những bảng nằm trong danh sách Audit (Bảo mật 2 lớp)
+--    IF UPPER(p_table_name) NOT IN ('ADMIN_PHANHE1.HSBA', 'ADMIN_PHANHE1.HSBA_DV', 'ADMIN_PHANHE1.DONTHUOC') THEN
+--        RAISE_APPLICATION_ERROR(-20001, 'Bao mat: Chi duoc phep khoi phuc cac bang nam trong dien Kiem toan!');
+--    END IF;
+--
+--    v_sql_query := 'FLASHBACK TABLE ' || p_table_name || 
+--                   ' TO TIMESTAMP TO_TIMESTAMP(''' || p_safe_time || ''', ''YYYY-MM-DD HH24:MI:SS'')';
+--                   
+--    DBMS_OUTPUT.PUT_LINE('Thuc thi lenh: ' || v_sql_query);
+--    EXECUTE IMMEDIATE v_sql_query;
+--    DBMS_OUTPUT.PUT_LINE('=> Khoi phuc bang ' || p_table_name || ' thanh cong!');
+--
+--EXCEPTION
+--    WHEN OTHERS THEN
+--        DBMS_OUTPUT.PUT_LINE('Loi Flashback: ' || SQLERRM);
+--        RAISE; 
+--END SP_RESTORE_FLASHBACK;
+--/
 -- =================================================================
 -- BACKUP && RESTORE (END)
 -- =================================================================
@@ -1758,18 +1833,13 @@ AUDIT EXECUTE ON ADMIN_PHANHE1.SP_RESTORE_FLASHBACK BY ACCESS;
 AUDIT TABLE BY ACCESS;
 
 
--- =====================================================================
--- BƯỚC 1: XÓA SẠCH CÁC POLICY CŨ BỊ LỖI CHÍNH TẢ ĐỂ LÀM SẠCH BẢNG
--- =====================================================================
+-- ==============================================================================
+-- BƯỚC 1: XÓA CÁC POLICY FGA CŨ
+-- ==============================================================================
 BEGIN
-    -- Xóa trên bảng DONTHUOC
     BEGIN DBMS_FGA.DROP_POLICY('ADMIN_PHANHE1', 'DONTHUOC', 'FGA_DONTHUOC_CAPNHAT_SAUDINH'); EXCEPTION WHEN OTHERS THEN NULL; END;
-    
-    -- Xóa trên bảng HSBA
     BEGIN DBMS_FGA.DROP_POLICY('ADMIN_PHANHE1', 'HSBA', 'FGA_HSBA_CAPNHAT_HOPPHAP'); EXCEPTION WHEN OTHERS THEN NULL; END;
     BEGIN DBMS_FGA.DROP_POLICY('ADMIN_PHANHE1', 'HSBA', 'FGA_HSBA_CAPNHAT_BATHOPPHAP'); EXCEPTION WHEN OTHERS THEN NULL; END;
-    
-    -- Xóa trên bảng HSBA_DV
     BEGIN DBMS_FGA.DROP_POLICY('ADMIN_PHANHE1', 'HSBA_DV', 'FGA_HSBADV_INS_DEL_BATHOPPHAP'); EXCEPTION WHEN OTHERS THEN NULL; END;
     BEGIN DBMS_FGA.DROP_POLICY('ADMIN_PHANHE1', 'HSBA_DV', 'FGA_HSBADV_UPD_COT_CAM_BATHOPPHAP'); EXCEPTION WHEN OTHERS THEN NULL; END;
     BEGIN DBMS_FGA.DROP_POLICY('ADMIN_PHANHE1', 'HSBA_DV', 'FGA_HSBADV_UPD_MAKTV_BATHOPPHAP'); EXCEPTION WHEN OTHERS THEN NULL; END;
@@ -1778,73 +1848,107 @@ BEGIN
 END;
 /
 
--- =====================================================================
--- CÀI ĐẶT TÌNH HUỐNG FINE-GRAINED AUDIT
--- =====================================================================
+-- ==============================================================================
+-- BƯỚC 2: TÁI CẤU TRÚC 7 HÀM FGA (NHẬN CONTEXT QUA THAM SỐ, BỎ AUTHID CURRENT_USER)
+-- ==============================================================================
 
 -- 1. Hàm cho 3a (Bảng DONTHUOC)
-CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_DONTHUOC_SAUDINH(p_MAHSBA VARCHAR2) RETURN VARCHAR2 AS
-    v_is_bs VARCHAR2(10);
+CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_DONTHUOC_SAUDINH(
+    p_MAHSBA IN VARCHAR2,
+    p_IS_BACSI IN VARCHAR2,
+    p_SESSION_USER IN VARCHAR2
+) RETURN VARCHAR2 AS
     v_count NUMBER;
 BEGIN
-    v_is_bs := SYS_CONTEXT('SYS_SESSION_ROLES', 'ROLE_BAC_SI');
-    -- Dùng Subquery trong PL/SQL thì vô tư, không bị FGA cấm
-    SELECT COUNT(*) INTO v_count FROM ADMIN_PHANHE1.HSBA 
-    WHERE MAHSBA = p_MAHSBA AND UPPER(MABS) = SYS_CONTEXT('USERENV', 'SESSION_USER');
-    
-    IF v_is_bs = 'TRUE' AND v_count > 0 THEN RETURN 'TRUE'; ELSE RETURN 'FALSE'; END IF;
+    IF p_IS_BACSI = 'TRUE' THEN
+        SELECT COUNT(*) INTO v_count FROM ADMIN_PHANHE1.HSBA 
+        WHERE MAHSBA = p_MAHSBA AND UPPER(MABS) = UPPER(p_SESSION_USER);
+        IF v_count > 0 THEN RETURN 'TRUE'; END IF;
+    END IF;
+    RETURN 'FALSE';
 EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
 /
 
 -- 2. Hàm cho 3b (Bảng HSBA - Hợp pháp)
-CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_HSBA_HOPPHAP(p_MABS VARCHAR2) RETURN VARCHAR2 AS
+CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_HSBA_HOPPHAP(
+    p_MABS IN VARCHAR2,
+    p_IS_BACSI IN VARCHAR2,
+    p_SESSION_USER IN VARCHAR2
+) RETURN VARCHAR2 AS
 BEGIN
-    IF SYS_CONTEXT('SYS_SESSION_ROLES', 'ROLE_BAC_SI') = 'TRUE' AND 
-       SYS_CONTEXT('USERENV', 'SESSION_USER') = UPPER(p_MABS) THEN
-        RETURN 'TRUE';
-    ELSE RETURN 'FALSE'; END IF;
+    IF p_IS_BACSI = 'TRUE' AND UPPER(p_SESSION_USER) = UPPER(p_MABS) THEN 
+        RETURN 'TRUE'; 
+    ELSE 
+        RETURN 'FALSE'; 
+    END IF;
 EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
 /
 
 -- 3. Hàm cho 3c (Bảng HSBA - Bất hợp pháp)
-CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_HSBA_BATHOPPHAP(p_MABS VARCHAR2) RETURN VARCHAR2 AS
+CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_HSBA_BATHOPPHAP(
+    p_MABS IN VARCHAR2,
+    p_SESSION_USER IN VARCHAR2
+) RETURN VARCHAR2 AS
 BEGIN
-    IF SYS_CONTEXT('USERENV', 'SESSION_USER') != UPPER(p_MABS) THEN RETURN 'TRUE'; ELSE RETURN 'FALSE'; END IF;
+    IF UPPER(p_SESSION_USER) = 'ADMIN_PHANHE1' THEN 
+        RETURN 'TRUE';
+    -- 2. Nếu là bác sĩ khác chạy -> Ghi log
+    ELSIF UPPER(p_SESSION_USER) != UPPER(p_MABS) THEN 
+        RETURN 'TRUE';
+    -- 3. Còn lại -> Không ghi log
+    ELSE 
+        RETURN 'FALSE'; 
+    END IF;
 EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
 /
 
 -- 4. Hàm cho 3d.1 (Bảng HSBA_DV - Kiểm tra KHÔNG phải Bác sĩ)
-CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_NOT_BACSI RETURN VARCHAR2 AS
+CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_NOT_BACSI(
+    p_IS_BACSI IN VARCHAR2
+) RETURN VARCHAR2 AS
 BEGIN
-    IF SYS_CONTEXT('SYS_SESSION_ROLES', 'ROLE_BAC_SI') = 'FALSE' THEN RETURN 'TRUE'; ELSE RETURN 'FALSE'; END IF;
+    IF NVL(p_IS_BACSI, 'FALSE') = 'FALSE' THEN RETURN 'TRUE'; ELSE RETURN 'FALSE'; END IF;
 EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
 /
 
 -- 5. Hàm cho 3d.3 (Bảng HSBA_DV - Kiểm tra KHÔNG phải Điều phối viên)
-CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_NOT_DPV RETURN VARCHAR2 AS
+CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_NOT_DPV(
+    p_IS_DPV IN VARCHAR2
+) RETURN VARCHAR2 AS
 BEGIN
-    IF SYS_CONTEXT('SYS_SESSION_ROLES', 'ROLE_DIEU_PHOI_VIEN') = 'FALSE' THEN RETURN 'TRUE'; ELSE RETURN 'FALSE'; END IF;
+    IF NVL(p_IS_DPV, 'FALSE') = 'FALSE' THEN RETURN 'TRUE'; ELSE RETURN 'FALSE'; END IF;
 EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
 /
 
 -- 6. Hàm cho 3d.4 (Bảng HSBA_DV - Kiểm tra KHÔNG phải KTV phụ trách)
-CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_NOT_KTV_CHINHLU(p_MAKTV VARCHAR2) RETURN VARCHAR2 AS
+CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_NOT_KTV_CHINHLU(
+    p_MAKTV IN VARCHAR2,
+    p_SESSION_USER IN VARCHAR2
+) RETURN VARCHAR2 AS
 BEGIN
-    IF SYS_CONTEXT('USERENV', 'SESSION_USER') != UPPER(p_MAKTV) THEN RETURN 'TRUE'; ELSE RETURN 'FALSE'; END IF;
+    IF UPPER(p_SESSION_USER) != UPPER(p_MAKTV) THEN RETURN 'TRUE'; ELSE RETURN 'FALSE'; END IF;
 EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
 /
 
 -- 7. Hàm cho 3d.5 (Bảng HSBA_DV - Kiểm tra KTV Hợp pháp)
-CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_KTV_HOPPHAP(p_MAKTV VARCHAR2) RETURN VARCHAR2 AS
+CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_KTV_HOPPHAP(
+    p_MAKTV IN VARCHAR2,
+    p_IS_KTV IN VARCHAR2,
+    p_SESSION_USER IN VARCHAR2
+) RETURN VARCHAR2 AS
 BEGIN
-    IF SYS_CONTEXT('SYS_SESSION_ROLES', 'ROLE_KYTHUATVIEN') = 'TRUE' AND 
-       SYS_CONTEXT('USERENV', 'SESSION_USER') = UPPER(p_MAKTV) THEN
-        RETURN 'TRUE';
-    ELSE RETURN 'FALSE'; END IF;
+    IF p_IS_KTV = 'TRUE' AND UPPER(p_SESSION_USER) = UPPER(p_MAKTV) THEN 
+        RETURN 'TRUE'; 
+    ELSE 
+        RETURN 'FALSE'; 
+    END IF;
 EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
 /
 
 
+-- ==============================================================================
+-- BƯỚC 3: TẠO POLICY MỚI (INJECT CONTEXT TRỰC TIẾP TỪ SQL VÀO HÀM)
+-- ==============================================================================
 BEGIN
     -- 3a. Giám sát Bác sĩ cập nhật ĐƠN THUỐC sau khi đã chỉ định
     DBMS_FGA.ADD_POLICY(
@@ -1852,7 +1956,7 @@ BEGIN
         object_name     => 'DONTHUOC',
         policy_name     => 'FGA_DONTHUOC_CAPNHAT_SAUDINH',
         audit_column    => 'MAHSBA, NGAYDT, TENTHUOC, LIEUDUNG',
-        audit_condition => 'ADMIN_PHANHE1.FN_FGA_DONTHUOC_SAUDINH(MAHSBA) = ''TRUE''',
+        audit_condition => 'ADMIN_PHANHE1.FN_FGA_DONTHUOC_SAUDINH(MAHSBA, SYS_CONTEXT(''SYS_SESSION_ROLES'', ''ROLE_BAC_SI''), SYS_CONTEXT(''USERENV'', ''SESSION_USER'')) = ''TRUE''',
         statement_types => 'UPDATE'
     );
 
@@ -1862,7 +1966,7 @@ BEGIN
         object_name     => 'HSBA',
         policy_name     => 'FGA_HSBA_CAPNHAT_HOPPHAP',
         audit_column    => 'CHANDOAN, DIEUTRI, KETLUAN',
-        audit_condition => 'ADMIN_PHANHE1.FN_FGA_HSBA_HOPPHAP(MABS) = ''TRUE''',
+        audit_condition => 'ADMIN_PHANHE1.FN_FGA_HSBA_HOPPHAP(MABS, SYS_CONTEXT(''SYS_SESSION_ROLES'', ''ROLE_BAC_SI''), SYS_CONTEXT(''USERENV'', ''SESSION_USER'')) = ''TRUE''',
         statement_types => 'UPDATE'
     );
 
@@ -1872,7 +1976,7 @@ BEGIN
         object_name     => 'HSBA',
         policy_name     => 'FGA_HSBA_CAPNHAT_BATHOPPHAP',
         audit_column    => 'CHANDOAN, DIEUTRI, KETLUAN',
-        audit_condition => 'ADMIN_PHANHE1.FN_FGA_HSBA_BATHOPPHAP(MABS) = ''TRUE''',
+        audit_condition => 'ADMIN_PHANHE1.FN_FGA_HSBA_BATHOPPHAP(MABS, SYS_CONTEXT(''USERENV'', ''SESSION_USER'')) = ''TRUE''',
         statement_types => 'UPDATE'
     );
 
@@ -1881,8 +1985,7 @@ BEGIN
         object_schema   => 'ADMIN_PHANHE1',
         object_name     => 'HSBA_DV',
         policy_name     => 'FGA_HSBADV_INS_DEL_BATHOPPHAP',
-        -- Vì không truyền tham số cột nào vào nên bỏ ngoặc
-        audit_condition => 'ADMIN_PHANHE1.FN_FGA_NOT_BACSI() = ''TRUE''',
+        audit_condition => 'ADMIN_PHANHE1.FN_FGA_NOT_BACSI(SYS_CONTEXT(''SYS_SESSION_ROLES'', ''ROLE_BAC_SI'')) = ''TRUE''',
         statement_types => 'INSERT, DELETE'
     );
 
@@ -1892,7 +1995,7 @@ BEGIN
         object_name     => 'HSBA_DV',
         policy_name     => 'FGA_HSBADV_UPD_COT_CAM_BATHOPPHAP',
         audit_column    => 'MAHSBA, LOAIDV, NGAYDV',
-        audit_condition => NULL, -- Giữ nguyên NULL vì bắt tất cả
+        audit_condition => NULL, -- Bắt tất cả nếu đụng vào cột cấm
         statement_types => 'UPDATE'
     );
 
@@ -1902,7 +2005,7 @@ BEGIN
         object_name     => 'HSBA_DV',
         policy_name     => 'FGA_HSBADV_UPD_MAKTV_BATHOPPHAP',
         audit_column    => 'MAKTV',
-        audit_condition => 'ADMIN_PHANHE1.FN_FGA_NOT_DPV() = ''TRUE''',
+        audit_condition => 'ADMIN_PHANHE1.FN_FGA_NOT_DPV(SYS_CONTEXT(''SYS_SESSION_ROLES'', ''ROLE_DIEU_PHOI_VIEN'')) = ''TRUE''',
         statement_types => 'UPDATE'
     );
 
@@ -1912,7 +2015,7 @@ BEGIN
         object_name     => 'HSBA_DV',
         policy_name     => 'FGA_HSBADV_UPD_KETQUA_BATHOPPHAP',
         audit_column    => 'KETQUA',
-        audit_condition => 'ADMIN_PHANHE1.FN_FGA_NOT_KTV_CHINHLU(MAKTV) = ''TRUE''',
+        audit_condition => 'ADMIN_PHANHE1.FN_FGA_NOT_KTV_CHINHLU(MAKTV, SYS_CONTEXT(''USERENV'', ''SESSION_USER'')) = ''TRUE''',
         statement_types => 'UPDATE'
     );
 
@@ -1922,7 +2025,7 @@ BEGIN
         object_name     => 'HSBA_DV',
         policy_name     => 'FGA_HSBADV_KTV_CAPNHAT_HOPPHAP',
         audit_column    => 'KETQUA',
-        audit_condition => 'ADMIN_PHANHE1.FN_FGA_KTV_HOPPHAP(MAKTV) = ''TRUE''',
+        audit_condition => 'ADMIN_PHANHE1.FN_FGA_KTV_HOPPHAP(MAKTV, SYS_CONTEXT(''SYS_SESSION_ROLES'', ''ROLE_KYTHUATVIEN''), SYS_CONTEXT(''USERENV'', ''SESSION_USER'')) = ''TRUE''',
         statement_types => 'UPDATE'
     );   
 END;
