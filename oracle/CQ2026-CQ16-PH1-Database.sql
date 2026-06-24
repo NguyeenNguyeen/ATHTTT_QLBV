@@ -1,20 +1,127 @@
-ALTER SESSION SET CURRENT_SCHEMA = SYS; -- SYS.V_$SESSION
 
--- Bỏ qua lớp container bảo mật của Oracle 12c+ để tạo user local dễ dàng
-ALTER SESSION SET "_ORACLE_SCRIPT"=true; 
-
--- XOÁ THIẾT LẬP FLASHBACK LÊN CÁC BẢNG ĐƯỢC AUDIT -> ĐỂ CÓ THỂ XOÁ ĐƯỢC USER ADMIN
+------------------------------------------------------------
+-- Tat Flashback Archive tren cac bang
+------------------------------------------------------------
+DECLARE
 BEGIN
-    BEGIN EXECUTE IMMEDIATE 'ALTER TABLE ADMIN_PHANHE1.HSBA NO FLASHBACK ARCHIVE'; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN EXECUTE IMMEDIATE 'ALTER TABLE ADMIN_PHANHE1.HSBA_DV NO FLASHBACK ARCHIVE'; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN EXECUTE IMMEDIATE 'ALTER TABLE ADMIN_PHANHE1.DONTHUOC NO FLASHBACK ARCHIVE'; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN EXECUTE IMMEDIATE 'DROP FLASHBACK ARCHIVE fda_phanhe1'; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN EXECUTE IMMEDIATE 'DROP FLASHBACK ARCHIVE FBA_BV_NEW'; EXCEPTION WHEN OTHERS THEN NULL; END;
+    FOR x IN (
+        SELECT owner_name, table_name
+        FROM dba_flashback_archive_tables
+        WHERE owner_name='ADMIN_PHANHE1'
+    )
+    LOOP
+        BEGIN
+            EXECUTE IMMEDIATE
+            'ALTER TABLE '||x.owner_name||'.'||x.table_name||
+            ' NO FLASHBACK ARCHIVE';
+        EXCEPTION
+            WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END;
+/
+------------------------------------------------------------
+-- Xoa Job Scheduler
+------------------------------------------------------------
+BEGIN
+    DBMS_SCHEDULER.DROP_JOB(
+        job_name=>'JOB_DAILY_BACKUP',
+        force=>TRUE
+    );
+EXCEPTION
+    WHEN OTHERS THEN NULL;
+END;
+/
+------------------------------------------------------------
+-- Xoa user ADMIN_PHANHE1
+------------------------------------------------------------
+BEGIN
+    EXECUTE IMMEDIATE 'DROP USER ADMIN_PHANHE1 CASCADE';
+EXCEPTION
+    WHEN OTHERS THEN NULL;
+END;
+/
+------------------------------------------------------------
+-- Xoa cac user NVxxx, BNxxx
+------------------------------------------------------------
+DECLARE
+BEGIN
+    FOR x IN (
+        SELECT username
+        FROM dba_users
+        WHERE username LIKE 'NV%'
+           OR username LIKE 'BN%'
+    )
+    LOOP
+        BEGIN
+            EXECUTE IMMEDIATE
+            'DROP USER "'||x.username||'" CASCADE';
+        EXCEPTION
+            WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END;
+/
+------------------------------------------------------------
+-- Xoa role
+------------------------------------------------------------
+BEGIN EXECUTE IMMEDIATE 'DROP ROLE ROLE_BAC_SI'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+BEGIN EXECUTE IMMEDIATE 'DROP ROLE ROLE_DIEU_PHOI_VIEN'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+BEGIN EXECUTE IMMEDIATE 'DROP ROLE ROLE_KYTHUATVIEN'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+BEGIN EXECUTE IMMEDIATE 'DROP ROLE ROLE_BENHNHAN'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+
+------------------------------------------------------------
+-- Xoa Flashback Archive
+------------------------------------------------------------
+BEGIN
+    EXECUTE IMMEDIATE 'DROP FLASHBACK ARCHIVE FBA_BV_NEW';
+EXCEPTION
+    WHEN OTHERS THEN NULL;
 END;
 /
 
-BEGIN EXECUTE IMMEDIATE 'DROP USER ADMIN_PHANHE1 CASCADE'; EXCEPTION WHEN OTHERS THEN NULL; END;
+------------------------------------------------------------
+-- Xoa OLS Policy
+------------------------------------------------------------
+BEGIN
+    SA_POLICY_ADMIN.REMOVE_TABLE_POLICY(
+        'OLS_BV',
+        'ADMIN_PHANHE1',
+        'THONGBAO'
+    );
+EXCEPTION
+    WHEN OTHERS THEN NULL;
+END;
 /
+
+BEGIN
+    SA_SYSDBA.DROP_POLICY('OLS_BV',TRUE);
+EXCEPTION
+    WHEN OTHERS THEN NULL;
+END;
+/
+
+------------------------------------------------------------
+-- Xoa Directory
+------------------------------------------------------------
+BEGIN
+    EXECUTE IMMEDIATE 'DROP DIRECTORY BACKUP_DIR';
+EXCEPTION
+    WHEN OTHERS THEN NULL;
+END;
+/
+
+PURGE DBA_RECYCLEBIN;
+
+-- ================== DON DEP XONG ==================
+-- =====================================================================
+-- KẾT THÚC PHẦN 0: HỆ THỐNG ĐÃ SẠCH, SẴN SÀNG TẠO LẠI TỪ ĐẦU
+-- =====================================================================
+
 
 -- Tạo user dùng chung cho cả nhóm
 CREATE USER ADMIN_PHANHE1 IDENTIFIED BY "Admin@123456" DEFAULT TABLESPACE USERS;
@@ -38,7 +145,6 @@ GRANT DATAPUMP_EXP_FULL_DATABASE TO ADMIN_PHANHE1;
 GRANT DATAPUMP_IMP_FULL_DATABASE TO ADMIN_PHANHE1;
 
 
-ALTER SESSION SET "_ORACLE_SCRIPT"=false;
 ALTER SESSION SET CURRENT_SCHEMA = ADMIN_PHANHE1;
 
 
@@ -215,7 +321,7 @@ CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_TAO_BENHNHAN (
     p_MATKHAU IN VARCHAR2,
     p_MABN_OUT OUT VARCHAR2 -- Tham số OUT cực kỳ quan trọng để trả mã về cho C#
 )
-AUTHID CURRENT_USER
+--AUTHID CURRENT_USER
 IS
     v_MABN VARCHAR2(20);
     v_sql VARCHAR2(500);
@@ -238,16 +344,16 @@ BEGIN
         (v_MABN, p_TENBN, p_PHAI, p_NGAYSINH, p_CCCD, p_SONHA, p_TENDUONG, p_QUANHUYEN, p_TINHTP, p_TIENSUBENH, p_TIENSUBENHGD, p_DIUNGTHUOC);
 
     -- Bước 3: Tạo User Oracle (C## + mã bệnh nhân tự sinh)
-    v_sql := 'CREATE USER C##' || v_MABN || ' IDENTIFIED BY "' || p_MATKHAU || '"';
+    v_sql := 'CREATE USER ' || v_MABN || ' IDENTIFIED BY "' || p_MATKHAU || '"';
     EXECUTE IMMEDIATE v_sql;
 
     -- Bước 4: Cấp quyền kết nối
-    v_sql := 'GRANT CREATE SESSION TO C##' || v_MABN;
+    v_sql := 'GRANT CREATE SESSION TO ' || v_MABN;
     EXECUTE IMMEDIATE v_sql;
 
     -- Bước 5: Gán role RBAC cho bệnh nhân nếu role đã được cài đặt
     BEGIN
-        v_sql := 'GRANT ROLE_BENHNHAN TO C##' || v_MABN;
+        v_sql := 'GRANT ROLE_BENHNHAN TO ' || v_MABN;
         EXECUTE IMMEDIATE v_sql;
     EXCEPTION
         WHEN OTHERS THEN NULL;
@@ -301,17 +407,31 @@ BEGIN
         (v_MANV, p_HOTEN, p_PHAI, p_NGAYSINH, p_CMND, p_QUEQUAN, p_SODT, p_VAITRO, p_CHUYENKHOA, p_COSO);
 
     -- Bước 3: Tạo User Oracle (C## + mã NV tự sinh)
-    v_sql := 'CREATE USER C##' || v_MANV || ' IDENTIFIED BY "' || p_MATKHAU || '"';
+    v_sql := 'CREATE USER ' || v_MANV || ' IDENTIFIED BY "' || p_MATKHAU || '"';
     EXECUTE IMMEDIATE v_sql;
 
     -- Bước 4: Cấp quyền kết nối cơ bản
-    v_sql := 'GRANT CREATE SESSION TO C##' || v_MANV;
+    v_sql := 'GRANT CREATE SESSION TO ' || v_MANV;
     EXECUTE IMMEDIATE v_sql;
 
-    -- Bước 5: Gán role RBAC cho kỹ thuật viên nếu role đã được cài đặt
+    -- Bước 5: Gán role RBAC theo vai trò nếu các role đã được cài đặt
     IF REGEXP_LIKE(LOWER(p_VAITRO), 'thu.*t.*vi') THEN
         BEGIN
-            v_sql := 'GRANT ROLE_KYTHUATVIEN TO C##' || v_MANV;
+            v_sql := 'GRANT ROLE_KYTHUATVIEN TO ' || v_MANV;
+            EXECUTE IMMEDIATE v_sql;
+        EXCEPTION
+            WHEN OTHERS THEN NULL;
+        END;
+    ELSIF REGEXP_LIKE(LOWER(p_VAITRO), 'bác sĩ|y sĩ|lãnh đạo khoa') THEN
+        BEGIN
+            v_sql := 'GRANT ROLE_BAC_SI TO ' || v_MANV;
+            EXECUTE IMMEDIATE v_sql;
+        EXCEPTION
+            WHEN OTHERS THEN NULL;
+        END;
+    ELSIF REGEXP_LIKE(LOWER(p_VAITRO), 'điều phối viên') THEN
+        BEGIN
+            v_sql := 'GRANT ROLE_DIEU_PHOI_VIEN TO ' || v_MANV;
             EXECUTE IMMEDIATE v_sql;
         EXCEPTION
             WHEN OTHERS THEN NULL;
@@ -429,11 +549,10 @@ CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_XOA_BENHNHAN (
 AUTHID CURRENT_USER
 IS
     v_sql VARCHAR2(500);
-    v_username VARCHAR2(50) := 'C##' || UPPER(p_MABN);
+    v_username VARCHAR2(50) := UPPER(p_MABN);
 BEGIN
     -- Kích hoạt cờ bỏ qua bảo mật Container 12c+
-    EXECUTE IMMEDIATE 'ALTER SESSION SET "_ORACLE_SCRIPT"=true';
-
+    
     -- Bước 0: Tự động ngắt tất cả các kết nối hiện tại của tài khoản này
     FOR rec IN (SELECT sid, serial# FROM v$session WHERE username = v_username)
     LOOP
@@ -461,11 +580,10 @@ CREATE OR REPLACE PROCEDURE ADMIN_PHANHE1.SP_XOA_NHANVIEN (
 AUTHID CURRENT_USER
 IS
     v_sql VARCHAR2(500);
-    v_username VARCHAR2(50) := 'C##' || UPPER(p_MANV);
+    v_username VARCHAR2(50) := UPPER(p_MANV);
 BEGIN
     -- Kích hoạt cờ bỏ qua bảo mật Container 12c+
-    EXECUTE IMMEDIATE 'ALTER SESSION SET "_ORACLE_SCRIPT"=true';
-
+    
     -- Bước 0: Tự động ngắt kết nối
     FOR rec IN (SELECT sid, serial# FROM v$session WHERE username = v_username)
     LOOP
@@ -526,7 +644,7 @@ BEGIN
     -- Bước 2: Đổi mật khẩu tài khoản Oracle (Nếu người dùng có nhập mật khẩu)
     -- Kiểm tra nếu p_MATKHAU không bị rỗng (NULL) thì mới chạy lệnh ALTER USER
     IF p_MATKHAU IS NOT NULL AND TRIM(p_MATKHAU) <> '' THEN
-        v_sql := 'ALTER USER C##' || p_MABN || ' IDENTIFIED BY "' || p_MATKHAU || '"';
+        v_sql := 'ALTER USER ' || p_MABN || ' IDENTIFIED BY "' || p_MATKHAU || '"';
         EXECUTE IMMEDIATE v_sql;
     END IF;
 
@@ -574,16 +692,16 @@ BEGIN
 
     -- Bước 2: Đổi mật khẩu tài khoản Oracle (Nếu người dùng có nhập mật khẩu trên Form)
     IF p_MATKHAU IS NOT NULL AND TRIM(p_MATKHAU) <> '' THEN
-        v_sql := 'ALTER USER C##' || p_MANV || ' IDENTIFIED BY "' || p_MATKHAU || '"';
+        v_sql := 'ALTER USER ' || p_MANV || ' IDENTIFIED BY "' || p_MATKHAU || '"';
         EXECUTE IMMEDIATE v_sql;
     END IF;
 
     -- Bước 3: Cập nhật role RBAC nếu vai trò được đổi sang/ra khỏi Kỹ thuật viên
     BEGIN
         IF REGEXP_LIKE(LOWER(p_VAITRO), 'thu.*t.*vi') THEN
-            v_sql := 'GRANT ROLE_KYTHUATVIEN TO C##' || p_MANV;
+            v_sql := 'GRANT ROLE_KYTHUATVIEN TO ' || p_MANV;
         ELSE
-            v_sql := 'REVOKE ROLE_KYTHUATVIEN FROM C##' || p_MANV;
+            v_sql := 'REVOKE ROLE_KYTHUATVIEN FROM ' || p_MANV;
         END IF;
         EXECUTE IMMEDIATE v_sql;
     EXCEPTION
@@ -619,8 +737,7 @@ BEGIN
            p.GRANTABLE AS "Được Cấp Tiếp" 
     FROM DBA_TAB_PRIVS p
     JOIN DBA_OBJECTS o ON p.TABLE_NAME = o.OBJECT_NAME AND p.OWNER = o.OWNER
-    WHERE p.GRANTEE LIKE 'C##%' 
-      AND p.GRANTEE NOT IN ('C##ADMIN', 'ADMIN_PHANHE1', USER) 
+    WHERE p.GRANTEE NOT IN ('ADMIN', 'ADMIN_PHANHE1', USER) 
       AND p.OWNER = 'ADMIN_PHANHE1'
       AND o.OBJECT_TYPE = 'TABLE'
     ORDER BY p.GRANTEE, p.TABLE_NAME;
@@ -640,8 +757,7 @@ BEGIN
            PRIVILEGE AS "Quyền", 
            GRANTABLE AS "Được Cấp Tiếp" 
     FROM DBA_COL_PRIVS 
-    WHERE GRANTEE LIKE 'C##%' 
-      AND GRANTEE != 'C##ADMIN'
+    WHERE GRANTEE != 'ADMIN'
       AND OWNER = 'ADMIN_PHANHE1'
     ORDER BY GRANTEE, TABLE_NAME, COLUMN_NAME;
 END;
@@ -661,8 +777,7 @@ BEGIN
            p.GRANTABLE AS "Được Cấp Tiếp"
     FROM DBA_TAB_PRIVS p
     JOIN DBA_OBJECTS o ON p.TABLE_NAME = o.OBJECT_NAME AND p.OWNER = o.OWNER
-    WHERE p.GRANTEE LIKE 'C##%'
-      AND p.GRANTEE NOT IN ('C##ADMIN', 'ADMIN_PHANHE1', USER)
+    WHERE p.GRANTEE NOT IN ('ADMIN', 'ADMIN_PHANHE1', USER)
       AND p.OWNER = 'ADMIN_PHANHE1'
       AND o.OBJECT_TYPE = 'VIEW' -- Chỉ lọc lấy View
     ORDER BY p.GRANTEE, p.TABLE_NAME;
@@ -683,8 +798,7 @@ BEGIN
            p.GRANTABLE AS "Được Cấp Tiếp"
     FROM DBA_TAB_PRIVS p
     JOIN DBA_OBJECTS o ON p.TABLE_NAME = o.OBJECT_NAME AND p.OWNER = o.OWNER
-    WHERE p.GRANTEE LIKE 'C##%'
-      AND p.GRANTEE NOT IN ('C##ADMIN', 'ADMIN_PHANHE1', USER)
+    WHERE p.GRANTEE NOT IN ('ADMIN', 'ADMIN_PHANHE1', USER)
       AND p.OWNER = 'ADMIN_PHANHE1'
       AND o.OBJECT_TYPE IN ('PROCEDURE', 'FUNCTION') -- Lọc lấy Procedure và Function
     ORDER BY p.GRANTEE, p.TABLE_NAME;
@@ -864,8 +978,7 @@ IS
     v_count NUMBER;
 BEGIN
     -- 1. Cho phép xóa cả các role được tạo bằng _ORACLE_SCRIPT (nếu cần)
-    EXECUTE IMMEDIATE 'ALTER SESSION SET "_ORACLE_SCRIPT"=true';
-
+    
     -- 2. Kiểm tra role có tồn tại không trước khi xóa
     SELECT COUNT(*) INTO v_count 
     FROM dba_roles 
@@ -912,7 +1025,6 @@ IS
     v_count NUMBER;
     v_sql_grant VARCHAR2(500);
 BEGIN
-EXECUTE IMMEDIATE 'ALTER SESSION SET "_ORACLE_SCRIPT"=true';
     -- 1. Kiểm tra xem role đã tồn tại chưa
     SELECT COUNT(*) INTO v_count 
     FROM dba_roles 
@@ -1158,10 +1270,9 @@ END SP_RESTORE_FLASHBACK;
 -- ============================================================
 -- BƯỚC 1: SỬA GRANT (bổ sung SELECT còn thiếu)
 -- ============================================================
-ALTER SESSION SET "_ORACLE_SCRIPT" = true;
+
 CREATE ROLE ROLE_DIEU_PHOI_VIEN;
 CREATE ROLE ROLE_BAC_SI;
-ALTER SESSION SET "_ORACLE_SCRIPT" = false;
 
 GRANT SELECT, INSERT, UPDATE ON ADMIN_PHANHE1.BENHNHAN  TO ROLE_DIEU_PHOI_VIEN;
 GRANT SELECT, INSERT         ON ADMIN_PHANHE1.HSBA       TO ROLE_DIEU_PHOI_VIEN;
@@ -1169,6 +1280,10 @@ GRANT UPDATE (MAKHOA, MABS)  ON ADMIN_PHANHE1.HSBA       TO ROLE_DIEU_PHOI_VIEN;
 GRANT SELECT                 ON ADMIN_PHANHE1.HSBA_DV    TO ROLE_DIEU_PHOI_VIEN; -- bổ sung
 GRANT UPDATE (MAKTV)         ON ADMIN_PHANHE1.HSBA_DV    TO ROLE_DIEU_PHOI_VIEN;
 GRANT SELECT                 ON ADMIN_PHANHE1.NHANVIEN TO ROLE_DIEU_PHOI_VIEN;
+GRANT SELECT                 ON ADMIN_PHANHE1.KHOA TO ROLE_DIEU_PHOI_VIEN;
+GRANT EXECUTE                ON ADMIN_PHANHE1.SP_TAO_BENHNHAN TO ROLE_DIEU_PHOI_VIEN;
+GRANT EXECUTE                ON ADMIN_PHANHE1.SP_SUA_BENHNHAN TO ROLE_DIEU_PHOI_VIEN;
+
 
 
 GRANT SELECT                              ON ADMIN_PHANHE1.HSBA      TO ROLE_BAC_SI;
@@ -1177,7 +1292,6 @@ GRANT SELECT, INSERT, DELETE              ON ADMIN_PHANHE1.HSBA_DV   TO ROLE_BAC
 GRANT SELECT                              ON ADMIN_PHANHE1.BENHNHAN  TO ROLE_BAC_SI;
 GRANT UPDATE (TIENSUBENH, TIENSUBENHGD, DIUNGTHUOC) ON ADMIN_PHANHE1.BENHNHAN TO ROLE_BAC_SI;
 GRANT SELECT, INSERT, UPDATE, DELETE      ON ADMIN_PHANHE1.DONTHUOC  TO ROLE_BAC_SI;
-
 -- ============================================================
 -- BƯỚC 2: HÀM VPD GỘP — 1 hàm cho mỗi bảng, xử lý cả 2 vai trò
 -- ============================================================
@@ -1198,11 +1312,9 @@ BEGIN
         RETURN '1=1';
     END IF;
 
-    IF v_session_user NOT LIKE 'C##%' THEN
-        RETURN '1=2';
-    END IF;
+    
 
-    v_manv := SUBSTR(v_session_user, 4);
+    v_manv := v_session_user;
 
     SELECT VAITRO INTO v_vaitro
     FROM ADMIN_PHANHE1.NHANVIEN
@@ -1242,11 +1354,9 @@ BEGIN
         RETURN '1=1';
     END IF;
 
-    IF v_session_user NOT LIKE 'C##%' THEN
-        RETURN '1=2';
-    END IF;
+    
 
-    v_manv := SUBSTR(v_session_user, 4);
+    v_manv := v_session_user;
 
     SELECT VAITRO INTO v_vaitro
     FROM ADMIN_PHANHE1.NHANVIEN
@@ -1285,11 +1395,9 @@ BEGIN
         RETURN '1=1';
     END IF;
 
-    IF v_session_user NOT LIKE 'C##%' THEN
-        RETURN '1=2';
-    END IF;
+    
 
-    v_manv := SUBSTR(v_session_user, 4);
+    v_manv := v_session_user;
 
     SELECT VAITRO INTO v_vaitro
     FROM ADMIN_PHANHE1.NHANVIEN
@@ -1333,11 +1441,9 @@ BEGIN
         RETURN '1=1';
     END IF;
 
-    IF v_session_user NOT LIKE 'C##%' THEN
-        RETURN '1=2';
-    END IF;
+    
 
-    v_manv := SUBSTR(v_session_user, 4);
+    v_manv := v_session_user;
 
     SELECT VAITRO INTO v_vaitro
     FROM ADMIN_PHANHE1.NHANVIEN
@@ -1684,7 +1790,7 @@ BEGIN
     v_is_bs := SYS_CONTEXT('SYS_SESSION_ROLES', 'ROLE_BAC_SI');
     -- Dùng Subquery trong PL/SQL thì vô tư, không bị FGA cấm
     SELECT COUNT(*) INTO v_count FROM ADMIN_PHANHE1.HSBA 
-    WHERE MAHSBA = p_MAHSBA AND 'C##' || UPPER(MABS) = SYS_CONTEXT('USERENV', 'SESSION_USER');
+    WHERE MAHSBA = p_MAHSBA AND UPPER(MABS) = SYS_CONTEXT('USERENV', 'SESSION_USER');
     
     IF v_is_bs = 'TRUE' AND v_count > 0 THEN RETURN 'TRUE'; ELSE RETURN 'FALSE'; END IF;
 EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
@@ -1694,7 +1800,7 @@ EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
 CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_HSBA_HOPPHAP(p_MABS VARCHAR2) RETURN VARCHAR2 AS
 BEGIN
     IF SYS_CONTEXT('SYS_SESSION_ROLES', 'ROLE_BAC_SI') = 'TRUE' AND 
-       SYS_CONTEXT('USERENV', 'SESSION_USER') = 'C##' || UPPER(p_MABS) THEN
+       SYS_CONTEXT('USERENV', 'SESSION_USER') = UPPER(p_MABS) THEN
         RETURN 'TRUE';
     ELSE RETURN 'FALSE'; END IF;
 EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
@@ -1703,7 +1809,7 @@ EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
 -- 3. Hàm cho 3c (Bảng HSBA - Bất hợp pháp)
 CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_HSBA_BATHOPPHAP(p_MABS VARCHAR2) RETURN VARCHAR2 AS
 BEGIN
-    IF SYS_CONTEXT('USERENV', 'SESSION_USER') != 'C##' || UPPER(p_MABS) THEN RETURN 'TRUE'; ELSE RETURN 'FALSE'; END IF;
+    IF SYS_CONTEXT('USERENV', 'SESSION_USER') != UPPER(p_MABS) THEN RETURN 'TRUE'; ELSE RETURN 'FALSE'; END IF;
 EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
 /
 
@@ -1724,7 +1830,7 @@ EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
 -- 6. Hàm cho 3d.4 (Bảng HSBA_DV - Kiểm tra KHÔNG phải KTV phụ trách)
 CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_NOT_KTV_CHINHLU(p_MAKTV VARCHAR2) RETURN VARCHAR2 AS
 BEGIN
-    IF SYS_CONTEXT('USERENV', 'SESSION_USER') != 'C##' || UPPER(p_MAKTV) THEN RETURN 'TRUE'; ELSE RETURN 'FALSE'; END IF;
+    IF SYS_CONTEXT('USERENV', 'SESSION_USER') != UPPER(p_MAKTV) THEN RETURN 'TRUE'; ELSE RETURN 'FALSE'; END IF;
 EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
 /
 
@@ -1732,7 +1838,7 @@ EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
 CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_FGA_KTV_HOPPHAP(p_MAKTV VARCHAR2) RETURN VARCHAR2 AS
 BEGIN
     IF SYS_CONTEXT('SYS_SESSION_ROLES', 'ROLE_KYTHUATVIEN') = 'TRUE' AND 
-       SYS_CONTEXT('USERENV', 'SESSION_USER') = 'C##' || UPPER(p_MAKTV) THEN
+       SYS_CONTEXT('USERENV', 'SESSION_USER') = UPPER(p_MAKTV) THEN
         RETURN 'TRUE';
     ELSE RETURN 'FALSE'; END IF;
 EXCEPTION WHEN OTHERS THEN RETURN 'FALSE'; END;
@@ -1835,7 +1941,6 @@ END;
 -- 2. KTV va Benh nhan chi xem/sua thong tin ca nhan cua chinh minh theo cac cot duoc phep.
 -- 3. UI WinForms dang nhap bang user Oracle that va truy cap qua cac view duoc grant theo role.
 
-ALTER SESSION SET "_ORACLE_SCRIPT"=true;
 
 BEGIN
     EXECUTE IMMEDIATE 'CREATE ROLE ROLE_KYTHUATVIEN';
@@ -1856,20 +1961,20 @@ END;
 CREATE OR REPLACE VIEW ADMIN_PHANHE1.V_RBAC_KTV_THONGTIN AS
 SELECT MANV, HOTEN, PHAI, NGAYSINH, CMND, QUEQUAN, SODT, VAITRO, CHUYENKHOA, COSO
 FROM ADMIN_PHANHE1.NHANVIEN
-WHERE 'C##' || UPPER(MANV) = SYS_CONTEXT('USERENV', 'SESSION_USER')
+WHERE UPPER(MANV) = SYS_CONTEXT('USERENV', 'SESSION_USER')
 WITH CHECK OPTION CONSTRAINT CK_V_RBAC_KTV_SELF;
 
 CREATE OR REPLACE VIEW ADMIN_PHANHE1.V_RBAC_KTV_DICHVU AS
 SELECT MAHSBA, LOAIDV, NGAYDV, MAKTV, KETQUA
 FROM ADMIN_PHANHE1.HSBA_DV
-WHERE 'C##' || UPPER(MAKTV) = SYS_CONTEXT('USERENV', 'SESSION_USER')
+WHERE UPPER(MAKTV) = SYS_CONTEXT('USERENV', 'SESSION_USER')
 WITH CHECK OPTION CONSTRAINT CK_V_RBAC_KTV_DICHVU;
 
 CREATE OR REPLACE VIEW ADMIN_PHANHE1.V_RBAC_BENHNHAN_THONGTIN AS
 SELECT MABN, TENBN, PHAI, NGAYSINH, CCCD, SONHA, TENDUONG, QUANHUYEN, TINHTP,
        TIENSUBENH, TIENSUBENHGD, DIUNGTHUOC
 FROM ADMIN_PHANHE1.BENHNHAN
-WHERE 'C##' || UPPER(MABN) = SYS_CONTEXT('USERENV', 'SESSION_USER')
+WHERE UPPER(MABN) = SYS_CONTEXT('USERENV', 'SESSION_USER')
 WITH CHECK OPTION CONSTRAINT CK_V_RBAC_BENHNHAN_SELF;
 
 GRANT SELECT ON ADMIN_PHANHE1.V_RBAC_KTV_THONGTIN TO ROLE_KYTHUATVIEN;
@@ -1905,27 +2010,38 @@ IS
         EXECUTE IMMEDIATE 'GRANT CREATE SESSION TO ' || v_safe_username;
     END;
 BEGIN
-    EXECUTE IMMEDIATE 'ALTER SESSION SET "_ORACLE_SCRIPT"=true';
-
+    
     FOR rec IN (SELECT MANV, VAITRO FROM ADMIN_PHANHE1.NHANVIEN)
     LOOP
-        v_username := 'C##' || UPPER(rec.MANV);
+        v_username := UPPER(rec.MANV);
         ensure_user(v_username);
 
+        -- Gán/Thu hồi ROLE_KYTHUATVIEN
         IF REGEXP_LIKE(LOWER(rec.VAITRO), 'thu.*t.*vi') THEN
-            EXECUTE IMMEDIATE 'GRANT ROLE_KYTHUATVIEN TO ' || DBMS_ASSERT.SIMPLE_SQL_NAME(v_username);
+            BEGIN EXECUTE IMMEDIATE 'GRANT ROLE_KYTHUATVIEN TO ' || DBMS_ASSERT.SIMPLE_SQL_NAME(v_username); EXCEPTION WHEN OTHERS THEN NULL; END;
         ELSE
-            BEGIN
-                EXECUTE IMMEDIATE 'REVOKE ROLE_KYTHUATVIEN FROM ' || DBMS_ASSERT.SIMPLE_SQL_NAME(v_username);
-            EXCEPTION
-                WHEN OTHERS THEN NULL;
-            END;
+            BEGIN EXECUTE IMMEDIATE 'REVOKE ROLE_KYTHUATVIEN FROM ' || DBMS_ASSERT.SIMPLE_SQL_NAME(v_username); EXCEPTION WHEN OTHERS THEN NULL; END;
+        END IF;
+
+        -- Gán/Thu hồi ROLE_BAC_SI
+        IF REGEXP_LIKE(LOWER(rec.VAITRO), 'bác sĩ|y sĩ|lãnh đạo khoa') THEN
+            BEGIN EXECUTE IMMEDIATE 'GRANT ROLE_BAC_SI TO ' || DBMS_ASSERT.SIMPLE_SQL_NAME(v_username); EXCEPTION WHEN OTHERS THEN NULL; END;
+        ELSE
+            BEGIN EXECUTE IMMEDIATE 'REVOKE ROLE_BAC_SI FROM ' || DBMS_ASSERT.SIMPLE_SQL_NAME(v_username); EXCEPTION WHEN OTHERS THEN NULL; END;
+        END IF;
+
+        -- Gán/Thu hồi ROLE_DIEU_PHOI_VIEN
+        IF REGEXP_LIKE(LOWER(rec.VAITRO), 'điều phối viên') THEN
+            BEGIN EXECUTE IMMEDIATE 'GRANT ROLE_DIEU_PHOI_VIEN TO ' || DBMS_ASSERT.SIMPLE_SQL_NAME(v_username); EXCEPTION WHEN OTHERS THEN NULL; END;
+        ELSE
+            BEGIN EXECUTE IMMEDIATE 'REVOKE ROLE_DIEU_PHOI_VIEN FROM ' || DBMS_ASSERT.SIMPLE_SQL_NAME(v_username); EXCEPTION WHEN OTHERS THEN NULL; END;
         END IF;
     END LOOP;
 
+
     FOR rec IN (SELECT MABN FROM ADMIN_PHANHE1.BENHNHAN)
     LOOP
-        v_username := 'C##' || UPPER(rec.MABN);
+        v_username := UPPER(rec.MABN);
         ensure_user(v_username);
         EXECUTE IMMEDIATE 'GRANT ROLE_BENHNHAN TO ' || DBMS_ASSERT.SIMPLE_SQL_NAME(v_username);
     END LOOP;
@@ -1947,8 +2063,8 @@ END;
 -- STARTUP;
 -- Hoặc có thể tắt SQL*Plus và khởi động lại database bằng tay để áp dụng cấu hình OLS mới
 -- 1. Đảm bảo đứng đúng Pluggable Database cục bộ
-ALTER SESSION SET CONTAINER = XEPDB1;
 ALTER SESSION SET CURRENT_SCHEMA = SYS;
+ALTER SESSION SET CONTAINER = XEPDB1;
 
 -- Vá lỗi đặc quyền phân tầng hệ thống
 GRANT INHERIT PRIVILEGES ON USER SYS TO LBACSYS;
@@ -1956,7 +2072,6 @@ GRANT INHERIT PRIVILEGES ON USER SYS TO LBACSYS;
 -- =====================================================================
 -- BƯỚC 0: DỌN DẸP HỆ THỐNG CŨ
 -- =====================================================================
-ALTER SESSION SET "_ORACLE_SCRIPT" = true;
 
 DECLARE v_count NUMBER;
 BEGIN
@@ -1982,7 +2097,6 @@ END;
 -- =====================================================================
 -- BƯỚC TIỀN ĐỀ: TẮT CỜ SCRIPT ĐỂ TẠO ĐỐI TƯỢNG LOCAL (SỬA LỖI ORA-42901)
 -- =====================================================================
-ALTER SESSION SET "_ORACLE_SCRIPT" = false;
 
 ALTER USER ADMIN_PHANHE1 QUOTA UNLIMITED ON USERS;
 GRANT DBA TO ADMIN_PHANHE1;
@@ -2119,3 +2233,25 @@ BEGIN
     SA_POLICY_ADMIN.ENABLE_TABLE_POLICY('OLS_BV', 'ADMIN_PHANHE1', 'THONGBAO');
 END;
 /
+
+-- ====================================
+-- CẤP ROLE CHO USER
+-- ====================================
+GRANT ROLE_BAC_SI TO NV004;
+GRANT ROLE_BAC_SI TO NV005;
+GRANT ROLE_BAC_SI TO NV006;
+GRANT ROLE_DIEU_PHOI_VIEN TO NV008;
+
+
+
+ SELECT OBJECT_NAME, OBJECT_TYPE, ORACLE_MAINTAINED 
+ FROM DBA_OBJECTS 
+ WHERE OWNER = 'ADMIN_PHANHE1';
+ 
+ 
+ SELECT USERNAME,
+       COMMON,
+       ORACLE_MAINTAINED
+FROM DBA_USERS
+WHERE USERNAME='ADMIN_PHANHE1';
+select * from dba_flashback_archive;

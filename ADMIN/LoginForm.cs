@@ -19,18 +19,35 @@ namespace ADMIN
 
         private void btnLogin_Click(object sender, EventArgs e)
         {
-            string username = txtUsername.Text.Trim();
+            string inputUsername = txtUsername.Text.Trim();
             string password = txtPassword.Text;
 
-            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
+            if (string.IsNullOrEmpty(inputUsername) || string.IsNullOrEmpty(password))
             {
                 MessageBox.Show("Vui lòng nhập tên đăng nhập và mật khẩu.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            // Hai chuỗi kết nối cho hai Service Name khác nhau
-            string connStringXepdb1 = $"User Id={username};Password={password};Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=orclpdb1)));";
-            string connStringXe = $"User Id={username};Password={password};Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=orcl21)));";
+            string username = inputUsername;
+            string dbaPriv = "";
+            if (username.Contains("as sysdba", StringComparison.OrdinalIgnoreCase))
+            {
+                username = username.Replace("as sysdba", "", StringComparison.OrdinalIgnoreCase).Trim();
+                dbaPriv = "DBA Privilege=SYSDBA;";
+            }
+            else if (username.Equals("sys", StringComparison.OrdinalIgnoreCase))
+            {
+                dbaPriv = "DBA Privilege=SYSDBA;";
+            }
+
+            // Sửa lại connection string
+            string connStringXepdb1 = $"User Id={username};Password={password};{dbaPriv}Data Source=" +
+                "(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))" +
+                "(CONNECT_DATA=(SERVICE_NAME=xepdb1)));";  // ✅ xepdb1 thay vì orclpdb1
+
+            string connStringXe = $"User Id={username};Password={password};{dbaPriv}Data Source=" +
+                "(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))" +
+                "(CONNECT_DATA=(SERVICE_NAME=orcl21)));";  // ✅ Cái này đúng rồi
 
             OracleConnection conn = null;
             string finalConnString = "";
@@ -69,13 +86,17 @@ namespace ADMIN
             catch (OracleException ex)
             {
                 if (conn != null) { conn.Dispose(); }
-                MessageBox.Show($"Lỗi kết nối cơ sở dữ liệu ({ex.Number}):\n{ex.Message}", "Lỗi Hệ Thống", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                string logPath = System.IO.Path.Combine(@"n:\ATBMHTTT\FixLanCUoi\ATHTTT_QLBV\ADMIN", "login_error_log.txt");
+                System.IO.File.WriteAllText(logPath, $"OracleException: {ex.Number}\nMessage: {ex.Message}\nStack: {ex.StackTrace}\nInner: {ex.InnerException?.Message}\nConnStringXepdb1: {connStringXepdb1}\nConnStringXe: {connStringXe}");
+                MessageBox.Show($"Lỗi kết nối cơ sở dữ liệu ({ex.Number}):\n{ex.Message}\n\nChi tiết lỗi đã được ghi vào login_error_log.txt", "Lỗi Hệ Thống", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
             catch (Exception ex)
             {
                 if (conn != null) { conn.Dispose(); }
-                MessageBox.Show($"Lỗi Hệ Thống: {ex.Message}", "Lỗi Hệ Thống", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                string logPath = System.IO.Path.Combine(@"n:\ATBMHTTT\FixLanCUoi\ATHTTT_QLBV\ADMIN", "login_error_log.txt");
+                System.IO.File.WriteAllText(logPath, $"SystemException: {ex.Message}\nStack: {ex.StackTrace}\nInner: {ex.InnerException?.Message}");
+                MessageBox.Show($"Lỗi Hệ Thống: {ex.Message}\n\nChi tiết lỗi đã được ghi vào login_error_log.txt", "Lỗi Hệ Thống", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
@@ -124,7 +145,7 @@ namespace ADMIN
                     return "OLS_USER";
                 }
 
-                if (accountCode.Contains("ADMIN"))
+                if (accountCode.Contains("ADMIN") || accountCode == "SYS" || accountCode == "SYSTEM")
                     return "ADMIN";
 
                 string roleFromSession = GetRoleFromSession(conn);
@@ -168,10 +189,13 @@ namespace ADMIN
                 
                 return "USER";
             }
-            catch
+            catch (Exception ex)
             {
+                string logPath = System.IO.Path.Combine(@"n:\ATBMHTTT\FixLanCUoi\ATHTTT_QLBV\ADMIN", "login_error_log.txt");
+                System.IO.File.AppendAllText(logPath, $"\nGetUserRole Exception: {ex.Message}\nStack: {ex.StackTrace}");
+
                 string accountCode = StripCommonUserPrefix(username.Trim().ToUpper());
-                if (accountCode.Contains("ADMIN"))
+                if (accountCode.Contains("ADMIN") || accountCode == "SYS" || accountCode == "SYSTEM")
                     return "ADMIN";
                 if (accountCode.StartsWith("BN"))
                     return "PATIENT";
@@ -248,10 +272,28 @@ namespace ADMIN
 
         private string GetRoleFromSession(OracleConnection conn)
         {
+            try
+            {
+                // Diagnostics: ghi nhận tất cả role hiện tại trong session
+                System.Collections.Generic.List<string> allRoles = new();
+                using (OracleCommand cmdAll = new OracleCommand("SELECT ROLE FROM SESSION_ROLES", conn))
+                using (OracleDataReader rAll = cmdAll.ExecuteReader())
+                {
+                    while (rAll.Read()) { allRoles.Add(rAll.GetString(0)); }
+                }
+                string logPath = System.IO.Path.Combine(@"n:\ATBMHTTT\FixLanCUoi\ATHTTT_QLBV\ADMIN", "login_error_log.txt");
+                System.IO.File.AppendAllText(logPath, $"\n[{DateTime.Now}] Active session roles for connection: " + string.Join(", ", allRoles));
+            }
+            catch (Exception ex)
+            {
+                string logPath = System.IO.Path.Combine(@"n:\ATBMHTTT\FixLanCUoi\ATHTTT_QLBV\ADMIN", "login_error_log.txt");
+                System.IO.File.AppendAllText(logPath, $"\n[{DateTime.Now}] Error listing session roles: {ex.Message}");
+            }
+
             const string query = @"
                 SELECT ROLE
                 FROM SESSION_ROLES
-                WHERE ROLE IN ('ROLE_YSI_BACSI', 'ROLE_DIEUPHOIVIEN', 'ROLE_KYTHUATVIEN', 'ROLE_BENHNHAN')";
+                WHERE ROLE IN ('ROLE_BAC_SI', 'ROLE_DIEU_PHOI_VIEN', 'ROLE_KYTHUATVIEN', 'ROLE_BENHNHAN')";
 
             using (OracleCommand cmd = new OracleCommand(query, conn))
             using (OracleDataReader reader = cmd.ExecuteReader())
@@ -259,9 +301,9 @@ namespace ADMIN
                 while (reader.Read())
                 {
                     string role = reader.GetString(0);
-                    if (role == "ROLE_YSI_BACSI")
+                    if (role == "ROLE_BAC_SI")
                         return "DOCTOR";
-                    if (role == "ROLE_DIEUPHOIVIEN")
+                    if (role == "ROLE_DIEU_PHOI_VIEN")
                         return "DISPATCHER";
                     if (role == "ROLE_KYTHUATVIEN")
                         return "TECHNICIAN";

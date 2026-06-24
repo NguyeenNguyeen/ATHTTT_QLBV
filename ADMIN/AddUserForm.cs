@@ -216,7 +216,7 @@ namespace ADMIN
                 // Thay đổi Connection String. Quan trọng:
                 // 1. Phải dùng địa chỉ IP localhost thay vì "127.0.0.1" hay "DESKTOP-E7U6Q38"
                 // 2. Chắc chắn sử dụng 'xe' làm SID.
-                string connectionString = @"User Id=ADMIN_PHANHE1;Password=Admin@123456;Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))(CONNECT_DATA=(SID=xe)));";
+                string connectionString = @"User Id=ADMIN_PHANHE1;Password=Admin@123456;Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=orcl21)));";
 
                 try
                 {
@@ -333,7 +333,7 @@ namespace ADMIN
             }
             else if (selectedType == "Nhân viên")
             {
-                string connectionString = @"User Id=ADMIN_PHANHE1;Password=Admin@123456;Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))(CONNECT_DATA=(SID=xe)));";
+                string connectionString = @"User Id=ADMIN_PHANHE1;Password=Admin@123456;Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=orcl21)));";
 
                 try
                 {
