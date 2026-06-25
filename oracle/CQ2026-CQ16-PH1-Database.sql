@@ -1,3 +1,10 @@
+-- =====================================================================
+-- TARGET PDB
+-- Chay script bang SYS/SYSDBA. Neu dang o CDB$ROOT thi dong nay se dua
+-- toan bo schema local cua do an vao dung PDB ORCL21PDB1.
+-- =====================================================================
+ALTER SESSION SET CONTAINER = ORCL21PDB1;
+ALTER SESSION SET CURRENT_SCHEMA = SYS;
 
 ------------------------------------------------------------
 -- Tat Flashback Archive tren cac bang
@@ -1064,7 +1071,7 @@ END;
 
 -- THAY ĐÔI THÀNH ĐƯỜNG DẪN THÍCH HỢP TRONG WINDOW: 1 THƯ MỤC ĐỂ LƯU CÁC FILE BACKUP CD: C:\Backup_Oracle
 -- Bẫy lỗi Directory để tránh nghẽn script
-BEGIN EXECUTE IMMEDIATE 'CREATE OR REPLACE DIRECTORY BACKUP_DIR AS ''/backup'''; EXCEPTION WHEN OTHERS THEN NULL; END;
+BEGIN EXECUTE IMMEDIATE 'CREATE OR REPLACE DIRECTORY BACKUP_DIR AS ''C:\Backup_Oracle'''; EXCEPTION WHEN OTHERS THEN NULL; END;
 /
 BEGIN EXECUTE IMMEDIATE 'GRANT READ, WRITE ON DIRECTORY BACKUP_DIR TO system'; EXCEPTION WHEN OTHERS THEN NULL; END;
 /
@@ -2174,7 +2181,7 @@ END;
 -- Hoặc có thể tắt SQL*Plus và khởi động lại database bằng tay để áp dụng cấu hình OLS mới
 -- 1. Đảm bảo đứng đúng Pluggable Database cục bộ
 ALTER SESSION SET CURRENT_SCHEMA = SYS;
-ALTER SESSION SET CONTAINER = ORCLPDB1;
+ALTER SESSION SET CONTAINER = ORCL21PDB1;
 
 -- Vá lỗi đặc quyền phân tầng hệ thống
 GRANT INHERIT PRIVILEGES ON USER SYS TO LBACSYS;
