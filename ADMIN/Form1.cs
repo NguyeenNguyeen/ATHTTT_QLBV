@@ -28,6 +28,15 @@ namespace ADMIN
         private Button btnRunRmanBackup;
         private Button btnRunRmanRestore;
         private TextBox txtTask5Log;
+        private TabControl task5Tabs;
+        private TabPage tabAuditTask5;
+        private TabPage tabBackupRestoreTask5;
+        private TextBox txtDataPumpDirectory;
+        private Button btnChooseDataPumpDirectory;
+        private Button btnRefreshDataPumpFiles;
+        private ListBox lstDataPumpFiles;
+        private TextBox txtDataPumpRestoreTable;
+        private bool auditLoaded;
 
         private void btnAddUser_Click(object sender, EventArgs e)
         {
@@ -645,55 +654,42 @@ namespace ADMIN
             tabTask5 = new TabPage("Audit + Backup/Recover");
             tabMain.Controls.Add(tabTask5);
 
-            var topPanel = new TableLayoutPanel
+            task5Tabs = new TabControl
             {
-                Dock = DockStyle.Top,
-                Height = 210,
-                ColumnCount = 6,
-                RowCount = 4,
-                Padding = new Padding(11),
+                Dock = DockStyle.Fill
             };
-            topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
-            topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 28));
-            topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
-            topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 28));
-            topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160));
-            topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 44));
+            tabAuditTask5 = new TabPage("Audit") { Padding = new Padding(11) };
+            tabBackupRestoreTask5 = new TabPage("Backup/Restore") { Padding = new Padding(11) };
+            task5Tabs.TabPages.Add(tabAuditTask5);
+            task5Tabs.TabPages.Add(tabBackupRestoreTask5);
+            task5Tabs.SelectedIndexChanged += (s, e) =>
+            {
+                if (task5Tabs.SelectedTab == tabAuditTask5)
+                    EnsureAuditLoaded();
+            };
+            tabMain.SelectedIndexChanged += (s, e) =>
+            {
+                if (tabMain.SelectedTab == tabTask5 && task5Tabs.SelectedTab == tabAuditTask5)
+                    EnsureAuditLoaded();
+            };
 
-            cbAuditType = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
+            cbAuditType = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Visible = false };
             cbAuditType.Items.AddRange(new object[] { "ALL", "STANDARD", "FINE-GRAINED" });
             cbAuditType.SelectedIndex = 0;
-            txtAuditUser = new TextBox { PlaceholderText = "User, VD: C##NV001", Dock = DockStyle.Fill };
-            txtAuditObject = new TextBox { PlaceholderText = "Object, VD: HSBA", Dock = DockStyle.Fill };
-            nudAuditLimit = new NumericUpDown { Minimum = 10, Maximum = 1000, Value = 100, Increment = 10, Dock = DockStyle.Fill };
-            btnLoadAudit = new Button { Text = "Tai audit log", BackColor = Color.LightSkyBlue, Dock = DockStyle.Fill };
+            txtAuditUser = new TextBox { Visible = false };
+            txtAuditObject = new TextBox { Visible = false };
+            nudAuditLimit = new NumericUpDown { Minimum = 10, Maximum = 1000, Value = 300, Increment = 10, Visible = false };
+            btnLoadAudit = new Button { Text = "Refresh", BackColor = Color.LightSkyBlue, Size = new Size(120, 36) };
             btnLoadAudit.Click += btnLoadAudit_Click;
-            btnTestConnection = new Button { Text = "Test connection", BackColor = Color.LightGreen, Dock = DockStyle.Fill };
-            btnTestConnection.Click += btnTestConnection_Click;
 
-            txtRestoreFile = new TextBox { PlaceholderText = "BV_PHANHE1_YYYYMMDD_HH24MISS.dmp", Dock = DockStyle.Fill };
-            txtRestoreTable = new TextBox { PlaceholderText = "Table optional, VD: HSBA", Dock = DockStyle.Fill };
-            btnBackupDataPump = new Button { Text = "Backup Data Pump", BackColor = Color.LightGreen, Dock = DockStyle.Fill };
-            btnBackupDataPump.Click += btnBackupDataPump_Click;
-            btnRestoreDataPump = new Button { Text = "Restore Data Pump", BackColor = Color.LightCoral, Dock = DockStyle.Fill };
-            btnRestoreDataPump.Click += btnRestoreDataPump_Click;
-
-            cbFlashbackTable = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
-            cbFlashbackTable.Items.AddRange(new object[] { "ADMIN_PHANHE1.HSBA", "ADMIN_PHANHE1.HSBA_DV", "ADMIN_PHANHE1.DONTHUOC" });
-            cbFlashbackTable.SelectedIndex = 0;
-            dtpFlashbackDate = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = "yyyy-MM-dd", Dock = DockStyle.Fill };
-            txtFlashbackTime = new TextBox { Text = DateTime.Now.ToString("HH:mm:ss"), Dock = DockStyle.Fill };
-            btnRestoreFlashback = new Button { Text = "Flashback restore", BackColor = Color.LightCoral, Dock = DockStyle.Fill };
-            btnRestoreFlashback.Click += btnRestoreFlashback_Click;
-            btnRunRmanBackup = new Button { Text = "RMAN backup .bat", Dock = DockStyle.Fill };
-            btnRunRmanBackup.Click += (s, e) => RunBatchScript("run_rman_backup.bat");
-            btnRunRmanRestore = new Button { Text = "RMAN restore .bat", BackColor = Color.LightCoral, Dock = DockStyle.Fill };
-            btnRunRmanRestore.Click += (s, e) => RunBatchScript("run_rman_restore.bat");
-
-            AddTask5Row(topPanel, 0, "Loai audit", cbAuditType, "Nguoi dung", txtAuditUser, "Ket noi", btnTestConnection);
-            AddTask5Row(topPanel, 1, "Doi tuong", txtAuditObject, "So dong", nudAuditLimit, "Audit", btnLoadAudit);
-            AddTask5Row(topPanel, 2, "File restore", txtRestoreFile, "Bang restore", txtRestoreTable, "Data Pump", CreateTask5Flow(btnBackupDataPump, btnRestoreDataPump));
-            AddTask5Row(topPanel, 3, "Bang flashback", cbFlashbackTable, "Ngay gio an toan", CreateTask5Flow(dtpFlashbackDate, txtFlashbackTime), "Recover", CreateTask5Flow(btnRestoreFlashback, btnRunRmanBackup, btnRunRmanRestore));
+            var auditTopPanel = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                Height = 50,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false
+            };
+            auditTopPanel.Controls.Add(btnLoadAudit);
 
             dgvAuditLog = new DataGridView
             {
@@ -705,6 +701,54 @@ namespace ADMIN
                 RowHeadersWidth = 51,
             };
 
+            tabAuditTask5.Controls.Add(dgvAuditLog);
+            tabAuditTask5.Controls.Add(auditTopPanel);
+
+            btnTestConnection = new Button { Text = "Test connection", BackColor = Color.LightGreen, Width = 150, Height = 34 };
+            btnTestConnection.Click += btnTestConnection_Click;
+
+            btnRunRmanBackup = new Button { Text = "Backup RMAN", BackColor = Color.LightGreen, Width = 150, Height = 36 };
+            btnRunRmanBackup.Click += (s, e) => RunBatchScript("run_rman_backup.bat");
+            btnRunRmanRestore = new Button { Text = "Restore RMAN", BackColor = Color.LightCoral, Width = 150, Height = 36 };
+            btnRunRmanRestore.Click += (s, e) => RunBatchScript("run_rman_restore.bat");
+
+            txtDataPumpDirectory = new TextBox { Text = @"C:\Backup_Oracle", Width = 460 };
+            btnChooseDataPumpDirectory = new Button { Text = "Chon thu muc", Width = 120, Height = 32 };
+            btnChooseDataPumpDirectory.Click += btnChooseDataPumpDirectory_Click;
+            btnRefreshDataPumpFiles = new Button { Text = "Refresh file", Width = 120, Height = 32 };
+            btnRefreshDataPumpFiles.Click += (s, e) => RefreshDataPumpFiles();
+            btnBackupDataPump = new Button { Text = "Backup Data Pump", BackColor = Color.LightGreen, Width = 150, Height = 36 };
+            btnBackupDataPump.Click += btnBackupDataPump_Click;
+            btnRestoreDataPump = new Button { Text = "Restore Data Pump", BackColor = Color.LightCoral, Width = 150, Height = 36 };
+            btnRestoreDataPump.Click += btnRestoreDataPump_Click;
+            lstDataPumpFiles = new ListBox { Dock = DockStyle.Fill };
+            txtDataPumpRestoreTable = new TextBox { PlaceholderText = "Table optional, VD: HSBA", Width = 220 };
+            txtRestoreFile = new TextBox { Visible = false };
+            txtRestoreTable = txtDataPumpRestoreTable;
+
+            cbFlashbackTable = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 260 };
+            cbFlashbackTable.Items.AddRange(new object[] { "ADMIN_PHANHE1.HSBA", "ADMIN_PHANHE1.HSBA_DV", "ADMIN_PHANHE1.DONTHUOC" });
+            cbFlashbackTable.SelectedIndex = 0;
+            dtpFlashbackDate = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = "yyyy-MM-dd", Width = 160 };
+            txtFlashbackTime = new TextBox { Text = DateTime.Now.ToString("HH:mm:ss"), Width = 100 };
+            btnRestoreFlashback = new Button { Text = "Chay Flashback", BackColor = Color.LightCoral, Width = 150, Height = 36 };
+            btnRestoreFlashback.Click += btnRestoreFlashback_Click;
+
+            var backupPanel = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 3,
+                Padding = new Padding(0),
+            };
+            backupPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 105));
+            backupPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 55));
+            backupPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 45));
+            backupPanel.Controls.Add(CreateRmanGroup(), 0, 0);
+            backupPanel.Controls.Add(CreateDataPumpGroup(), 0, 1);
+            backupPanel.Controls.Add(CreateFlashbackGroup(), 0, 2);
+            tabBackupRestoreTask5.Controls.Add(backupPanel);
+
             txtTask5Log = new TextBox
             {
                 Dock = DockStyle.Bottom,
@@ -714,9 +758,9 @@ namespace ADMIN
                 ScrollBars = ScrollBars.Vertical,
             };
 
-            tabTask5.Controls.Add(dgvAuditLog);
+            tabTask5.Controls.Add(task5Tabs);
             tabTask5.Controls.Add(txtTask5Log);
-            tabTask5.Controls.Add(topPanel);
+            RefreshDataPumpFiles();
         }
 
         private static void AddTask5Row(TableLayoutPanel panel, int row, string label1, Control control1, string label2, Control control2, string label3, Control control3)
@@ -740,6 +784,175 @@ namespace ADMIN
                 flow.Controls.Add(control);
             }
             return flow;
+        }
+
+        private GroupBox CreateRmanGroup()
+        {
+            var group = new GroupBox
+            {
+                Text = "Phuong phap 1 - RMAN",
+                Dock = DockStyle.Fill,
+                Padding = new Padding(12)
+            };
+
+            var flow = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false
+            };
+            flow.Controls.Add(btnRunRmanBackup);
+            flow.Controls.Add(btnRunRmanRestore);
+            flow.Controls.Add(btnTestConnection);
+            group.Controls.Add(flow);
+            return group;
+        }
+
+        private GroupBox CreateDataPumpGroup()
+        {
+            var group = new GroupBox
+            {
+                Text = "Phuong phap 2 - Data Pump",
+                Dock = DockStyle.Fill,
+                Padding = new Padding(12)
+            };
+
+            var layout = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 3
+            };
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+            var directoryFlow = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false
+            };
+            directoryFlow.Controls.Add(new Label { Text = "Thu muc backup:", AutoSize = true, Padding = new Padding(0, 7, 0, 0) });
+            directoryFlow.Controls.Add(txtDataPumpDirectory);
+            directoryFlow.Controls.Add(btnChooseDataPumpDirectory);
+            directoryFlow.Controls.Add(btnRefreshDataPumpFiles);
+
+            var actionFlow = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false
+            };
+            actionFlow.Controls.Add(btnBackupDataPump);
+            actionFlow.Controls.Add(btnRestoreDataPump);
+            actionFlow.Controls.Add(new Label { Text = "Bang restore:", AutoSize = true, Padding = new Padding(12, 8, 0, 0) });
+            actionFlow.Controls.Add(txtDataPumpRestoreTable);
+
+            layout.Controls.Add(directoryFlow, 0, 0);
+            layout.Controls.Add(actionFlow, 0, 1);
+            layout.Controls.Add(lstDataPumpFiles, 0, 2);
+            group.Controls.Add(layout);
+            return group;
+        }
+
+        private GroupBox CreateFlashbackGroup()
+        {
+            var group = new GroupBox
+            {
+                Text = "Phuong phap 3 - Flashback",
+                Dock = DockStyle.Fill,
+                Padding = new Padding(12)
+            };
+
+            var flow = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                Height = 48,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false
+            };
+            flow.Controls.Add(new Label { Text = "Bang:", AutoSize = true, Padding = new Padding(0, 8, 0, 0) });
+            flow.Controls.Add(cbFlashbackTable);
+            flow.Controls.Add(new Label { Text = "Ngay:", AutoSize = true, Padding = new Padding(12, 8, 0, 0) });
+            flow.Controls.Add(dtpFlashbackDate);
+            flow.Controls.Add(new Label { Text = "Gio:", AutoSize = true, Padding = new Padding(12, 8, 0, 0) });
+            flow.Controls.Add(txtFlashbackTime);
+            flow.Controls.Add(btnRestoreFlashback);
+            group.Controls.Add(flow);
+            return group;
+        }
+
+        private void EnsureAuditLoaded()
+        {
+            if (auditLoaded)
+                return;
+
+            btnLoadAudit_Click(this, EventArgs.Empty);
+        }
+
+        private string GetDataPumpDirectory()
+        {
+            string path = txtDataPumpDirectory.Text.Trim();
+            if (string.IsNullOrWhiteSpace(path))
+                path = @"C:\Backup_Oracle";
+            return Path.GetFullPath(path);
+        }
+
+        private void ConfigureDataPumpDirectory()
+        {
+            string path = GetDataPumpDirectory();
+            Directory.CreateDirectory(path);
+            txtDataPumpDirectory.Text = path;
+            string oraclePath = path.Replace("'", "''");
+
+            OracleHelper.ExecuteNonQuery($"CREATE OR REPLACE DIRECTORY BACKUP_DIR AS '{oraclePath}'");
+            try
+            {
+                OracleHelper.ExecuteNonQuery("GRANT READ, WRITE ON DIRECTORY BACKUP_DIR TO ADMIN_PHANHE1");
+            }
+            catch
+            {
+                // Directory creator may already have the needed privilege.
+            }
+        }
+
+        private void RefreshDataPumpFiles()
+        {
+            try
+            {
+                string path = GetDataPumpDirectory();
+                Directory.CreateDirectory(path);
+                txtDataPumpDirectory.Text = path;
+
+                lstDataPumpFiles.Items.Clear();
+                foreach (string file in Directory.GetFiles(path, "*.dmp")
+                             .OrderByDescending(File.GetLastWriteTime))
+                {
+                    lstDataPumpFiles.Items.Add(Path.GetFileName(file));
+                }
+
+                WriteTask5Log($"Da tai {lstDataPumpFiles.Items.Count} file .dmp tu {path}.");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Loi tai danh sach backup", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                WriteTask5Log("Tai danh sach backup that bai: " + ex.Message);
+            }
+        }
+
+        private void btnChooseDataPumpDirectory_Click(object sender, EventArgs e)
+        {
+            using (FolderBrowserDialog dialog = new FolderBrowserDialog())
+            {
+                dialog.Description = "Chon thu muc luu file Data Pump";
+                dialog.SelectedPath = GetDataPumpDirectory();
+                if (dialog.ShowDialog() == DialogResult.OK)
+                {
+                    txtDataPumpDirectory.Text = dialog.SelectedPath;
+                    RefreshDataPumpFiles();
+                }
+            }
         }
 
         private void btnTestConnection_Click(object sender, EventArgs e)
@@ -789,10 +1002,12 @@ WHERE ROWNUM <= :row_limit";
                 }
 
                 dgvAuditLog.DataSource = dt;
+                auditLoaded = true;
                 WriteTask5Log($"Da tai {dt.Rows.Count} dong audit log.");
             }
             catch (Exception ex)
             {
+                auditLoaded = false;
                 MessageBox.Show(ex.Message, "Loi tai audit log", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 WriteTask5Log("Tai audit log that bai: " + ex.Message);
             }
@@ -802,8 +1017,10 @@ WHERE ROWNUM <= :row_limit";
         {
             try
             {
+                ConfigureDataPumpDirectory();
                 OracleHelper.ExecuteNonQuery("ADMIN_PHANHE1.SP_BACKUP_DATAPUMP", commandType: CommandType.StoredProcedure);
-                WriteTask5Log("Da gui job backup Data Pump. File .dmp nam trong Oracle DIRECTORY BACKUP_DIR.");
+                RefreshDataPumpFiles();
+                WriteTask5Log("Da gui job backup Data Pump. File .dmp nam trong thu muc: " + GetDataPumpDirectory());
             }
             catch (Exception ex)
             {
@@ -814,11 +1031,11 @@ WHERE ROWNUM <= :row_limit";
 
         private void btnRestoreDataPump_Click(object sender, EventArgs e)
         {
-            string fileName = txtRestoreFile.Text.Trim();
-            string tableName = txtRestoreTable.Text.Trim();
+            string fileName = lstDataPumpFiles.SelectedItem?.ToString() ?? "";
+            string tableName = txtDataPumpRestoreTable.Text.Trim();
             if (string.IsNullOrWhiteSpace(fileName))
             {
-                MessageBox.Show("Nhap ten file .dmp can restore.", "Thieu thong tin", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Chon file .dmp can restore trong danh sach.", "Thieu thong tin", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -827,6 +1044,7 @@ WHERE ROWNUM <= :row_limit";
 
             try
             {
+                ConfigureDataPumpDirectory();
                 OracleHelper.ExecuteNonQuery(
                     "ADMIN_PHANHE1.SP_RESTORE_DATAPUMP",
                     new Dictionary<string, object>
