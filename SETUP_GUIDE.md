@@ -53,19 +53,33 @@ Phải thấy ít nhất 10 procedure tên bắt đầu bằng `SP_`
 
 ## Bước 3: Cập Nhật Connection String (nếu cần)
 
-### Kiểm tra file Form1.cs (OracleHelper.AdminConnectionString):
+### Kiểm tra file `ADMIN/OracleConnectionConfig.cs`
+
+Project now reads Oracle settings from a single helper, with environment variable overrides:
+
+- `ATHTTT_ORACLE_HOST`
+- `ATHTTT_ORACLE_PORT`
+- `ATHTTT_ORACLE_ADMIN_SERVICE`
+- `ATHTTT_ORACLE_LOGIN_SERVICE`
+- `ATHTTT_ORACLE_ADMIN_USER`
+- `ATHTTT_ORACLE_ADMIN_PASSWORD`
+
+If you do not set them, the app uses these defaults:
+
+- Host: `localhost`
+- Port: `1521`
+- Admin service: `ORCLPDB1`
+- Login service: `ORCLPDB1`
+- Admin user: `ADMIN_PHANHE1`
+- Admin password: `Admin@123456`
+
+### Example connection built by the helper:
 
 ```csharp
-public static readonly string AdminConnectionString = 
-    @"User Id=ADMIN_PHANHE1;Password=Admin@123456;Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=127.0.0.1)(PORT=1521))(CONNECT_DATA=(SERVER=DEDICATED)(SERVICE_NAME=orcl21)));";
+public static readonly string AdminConnectionString = OracleConnectionConfig.BuildAdminConnectionString();
 ```
 
-**Sửa nếu cần**:
-- `User Id`: Tài khoản Oracle (ADMIN_PHANHE1)
-- `Password`: Mật khẩu
-- `HOST`: IP database (127.0.0.1 = localhost)
-- `PORT`: Port Oracle (1521 = default)
-- `SERVICE_NAME`: orcl21 hoặc tên service của bạn
+Set the environment variables above if your machine uses a different host, port, service name, or admin account.
 
 ---
 

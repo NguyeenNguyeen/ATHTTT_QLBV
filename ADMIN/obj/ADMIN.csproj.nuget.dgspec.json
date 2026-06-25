@@ -1,20 +1,24 @@
 {
   "format": 1,
   "restore": {
-    "N:\\ATBMHTTT\\FixLanCUoi\\ATHTTT_QLBV\\ADMIN\\ADMIN.csproj": {}
+    "E:\\Desktop\\ATBM-256\\ATHTTT_QLBV\\ADMIN\\ADMIN.csproj": {}
   },
   "projects": {
-    "N:\\ATBMHTTT\\FixLanCUoi\\ATHTTT_QLBV\\ADMIN\\ADMIN.csproj": {
+    "E:\\Desktop\\ATBM-256\\ATHTTT_QLBV\\ADMIN\\ADMIN.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "N:\\ATBMHTTT\\FixLanCUoi\\ATHTTT_QLBV\\ADMIN\\ADMIN.csproj",
+        "projectUniqueName": "E:\\Desktop\\ATBM-256\\ATHTTT_QLBV\\ADMIN\\ADMIN.csproj",
         "projectName": "ADMIN",
-        "projectPath": "N:\\ATBMHTTT\\FixLanCUoi\\ATHTTT_QLBV\\ADMIN\\ADMIN.csproj",
-        "packagesPath": "C:\\Users\\NGUYEN NHAT LAN\\.nuget\\packages\\",
-        "outputPath": "N:\\ATBMHTTT\\FixLanCUoi\\ATHTTT_QLBV\\ADMIN\\obj\\",
+        "projectPath": "E:\\Desktop\\ATBM-256\\ATHTTT_QLBV\\ADMIN\\ADMIN.csproj",
+        "packagesPath": "C:\\Users\\Admin\\.nuget\\packages\\",
+        "outputPath": "E:\\Desktop\\ATBM-256\\ATHTTT_QLBV\\ADMIN\\obj\\",
         "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
         "configFilePaths": [
-          "C:\\Users\\NGUYEN NHAT LAN\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Users\\Admin\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
@@ -22,10 +26,12 @@
         ],
         "sources": {
           "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "C:\\Program Files\\dotnet\\library-packs": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
-          "net10.0-windows7.0": {
+          "net10.0-windows": {
+            "framework": "net10.0-windows7.0",
             "targetAlias": "net10.0-windows",
             "projectReferences": {}
           }
@@ -40,10 +46,11 @@
           "auditLevel": "low",
           "auditMode": "all"
         },
-        "SdkAnalysisLevel": "10.0.200"
+        "SdkAnalysisLevel": "10.0.300"
       },
       "frameworks": {
-        "net10.0-windows7.0": {
+        "net10.0-windows": {
+          "framework": "net10.0-windows7.0",
           "targetAlias": "net10.0-windows",
           "dependencies": {
             "Oracle.ManagedDataAccess.Core": {
@@ -70,7 +77,7 @@
               "privateAssets": "none"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.202/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.301/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.CSharp": "(,4.7.32767]",
             "Microsoft.VisualBasic": "(,10.4.32767]",

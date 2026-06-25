@@ -2167,7 +2167,7 @@ END;
 -- Hoặc có thể tắt SQL*Plus và khởi động lại database bằng tay để áp dụng cấu hình OLS mới
 -- 1. Đảm bảo đứng đúng Pluggable Database cục bộ
 ALTER SESSION SET CURRENT_SCHEMA = SYS;
-ALTER SESSION SET CONTAINER = XEPDB1;
+ALTER SESSION SET CONTAINER = ORCLPDB1;
 
 -- Vá lỗi đặc quyền phân tầng hệ thống
 GRANT INHERIT PRIVILEGES ON USER SYS TO LBACSYS;

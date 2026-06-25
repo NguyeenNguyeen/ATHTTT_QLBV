@@ -1,5 +1,5 @@
 -- 1. Đảm bảo đứng đúng Pluggable Database cục bộ
-ALTER SESSION SET CONTAINER = XEPDB1;
+ALTER SESSION SET CONTAINER = ORCLPDB1;
 ALTER SESSION SET CURRENT_SCHEMA = SYS;
 
 -- Vá lỗi đặc quyền phân tầng hệ thống

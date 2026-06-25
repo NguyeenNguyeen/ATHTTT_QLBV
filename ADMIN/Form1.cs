@@ -1,4 +1,5 @@
 using System.Data;
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 using Oracle.ManagedDataAccess.Client;
 
@@ -6,9 +7,27 @@ namespace ADMIN
 {
     public partial class Form1 : Form
     {
-        private const string ConnectionString = "User Id=ADMIN_PHANHE1;Password=Admin@123456;Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=orcl21)))";
         private static readonly Regex OracleIdentifierRegex = new("^[A-Za-z][A-Za-z0-9_$#]*$", RegexOptions.Compiled);
         private PermissionManager _permManager = new PermissionManager();
+        private TabPage tabTask5;
+        private DataGridView dgvAuditLog;
+        private TextBox txtAuditUser;
+        private TextBox txtAuditObject;
+        private ComboBox cbAuditType;
+        private NumericUpDown nudAuditLimit;
+        private Button btnLoadAudit;
+        private Button btnTestConnection;
+        private Button btnBackupDataPump;
+        private TextBox txtRestoreFile;
+        private TextBox txtRestoreTable;
+        private Button btnRestoreDataPump;
+        private ComboBox cbFlashbackTable;
+        private DateTimePicker dtpFlashbackDate;
+        private TextBox txtFlashbackTime;
+        private Button btnRestoreFlashback;
+        private Button btnRunRmanBackup;
+        private Button btnRunRmanRestore;
+        private TextBox txtTask5Log;
 
         private void btnAddUser_Click(object sender, EventArgs e)
         {
@@ -55,7 +74,7 @@ namespace ADMIN
             }
 
             // Sử dụng chuỗi kết nối ADMIN_PHANHE1 để truy xuất (tránh lỗi Timeout như trước đó)
-            string connectionString = @"User Id=ADMIN_PHANHE1;Password=Admin@123456;Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=orcl21)));";
+            string connectionString = OracleConnectionConfig.BuildAdminConnectionString();
 
             try
             {
@@ -150,7 +169,7 @@ namespace ADMIN
 
             if (dialogResult == DialogResult.Yes)
             {
-                string connectionString = @"User Id=ADMIN_PHANHE1;Password=Admin@123456;Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=orcl21)));";
+                string connectionString = OracleConnectionConfig.BuildAdminConnectionString();
 
                 try
                 {
@@ -211,7 +230,7 @@ namespace ADMIN
                 return;
             }
 
-            string connectionString = @"User Id=ADMIN_PHANHE1;Password=Admin@123456;Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=orcl21)));";
+            string connectionString = OracleConnectionConfig.BuildAdminConnectionString();
 
             try
             {
@@ -604,6 +623,7 @@ namespace ADMIN
             InitializeComponent();
             LoadGranteeList();
             InitializePermissionLevelControls();
+            InitializeTask5Controls();
         }
 
         private void InitializePermissionLevelControls()
@@ -618,6 +638,268 @@ namespace ADMIN
             chkRevokeColumnLevel.Checked = false;
             chkRevokeColumnLevel.Enabled = false; // Disable cho đến khi SELECT/UPDATE được chọn
             clbRevokeColumns.Visible = false;
+        }
+
+        private void InitializeTask5Controls()
+        {
+            tabTask5 = new TabPage("Audit + Backup/Recover");
+            tabMain.Controls.Add(tabTask5);
+
+            var topPanel = new TableLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                Height = 210,
+                ColumnCount = 6,
+                RowCount = 4,
+                Padding = new Padding(11),
+            };
+            topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
+            topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 28));
+            topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
+            topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 28));
+            topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160));
+            topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 44));
+
+            cbAuditType = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
+            cbAuditType.Items.AddRange(new object[] { "ALL", "STANDARD", "FINE-GRAINED" });
+            cbAuditType.SelectedIndex = 0;
+            txtAuditUser = new TextBox { PlaceholderText = "User, VD: C##NV001", Dock = DockStyle.Fill };
+            txtAuditObject = new TextBox { PlaceholderText = "Object, VD: HSBA", Dock = DockStyle.Fill };
+            nudAuditLimit = new NumericUpDown { Minimum = 10, Maximum = 1000, Value = 100, Increment = 10, Dock = DockStyle.Fill };
+            btnLoadAudit = new Button { Text = "Tai audit log", BackColor = Color.LightSkyBlue, Dock = DockStyle.Fill };
+            btnLoadAudit.Click += btnLoadAudit_Click;
+            btnTestConnection = new Button { Text = "Test connection", BackColor = Color.LightGreen, Dock = DockStyle.Fill };
+            btnTestConnection.Click += btnTestConnection_Click;
+
+            txtRestoreFile = new TextBox { PlaceholderText = "BV_PHANHE1_YYYYMMDD_HH24MISS.dmp", Dock = DockStyle.Fill };
+            txtRestoreTable = new TextBox { PlaceholderText = "Table optional, VD: HSBA", Dock = DockStyle.Fill };
+            btnBackupDataPump = new Button { Text = "Backup Data Pump", BackColor = Color.LightGreen, Dock = DockStyle.Fill };
+            btnBackupDataPump.Click += btnBackupDataPump_Click;
+            btnRestoreDataPump = new Button { Text = "Restore Data Pump", BackColor = Color.LightCoral, Dock = DockStyle.Fill };
+            btnRestoreDataPump.Click += btnRestoreDataPump_Click;
+
+            cbFlashbackTable = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
+            cbFlashbackTable.Items.AddRange(new object[] { "ADMIN_PHANHE1.HSBA", "ADMIN_PHANHE1.HSBA_DV", "ADMIN_PHANHE1.DONTHUOC" });
+            cbFlashbackTable.SelectedIndex = 0;
+            dtpFlashbackDate = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = "yyyy-MM-dd", Dock = DockStyle.Fill };
+            txtFlashbackTime = new TextBox { Text = DateTime.Now.ToString("HH:mm:ss"), Dock = DockStyle.Fill };
+            btnRestoreFlashback = new Button { Text = "Flashback restore", BackColor = Color.LightCoral, Dock = DockStyle.Fill };
+            btnRestoreFlashback.Click += btnRestoreFlashback_Click;
+            btnRunRmanBackup = new Button { Text = "RMAN backup .bat", Dock = DockStyle.Fill };
+            btnRunRmanBackup.Click += (s, e) => RunBatchScript("run_rman_backup.bat");
+            btnRunRmanRestore = new Button { Text = "RMAN restore .bat", BackColor = Color.LightCoral, Dock = DockStyle.Fill };
+            btnRunRmanRestore.Click += (s, e) => RunBatchScript("run_rman_restore.bat");
+
+            AddTask5Row(topPanel, 0, "Loai audit", cbAuditType, "Nguoi dung", txtAuditUser, "Ket noi", btnTestConnection);
+            AddTask5Row(topPanel, 1, "Doi tuong", txtAuditObject, "So dong", nudAuditLimit, "Audit", btnLoadAudit);
+            AddTask5Row(topPanel, 2, "File restore", txtRestoreFile, "Bang restore", txtRestoreTable, "Data Pump", CreateTask5Flow(btnBackupDataPump, btnRestoreDataPump));
+            AddTask5Row(topPanel, 3, "Bang flashback", cbFlashbackTable, "Ngay gio an toan", CreateTask5Flow(dtpFlashbackDate, txtFlashbackTime), "Recover", CreateTask5Flow(btnRestoreFlashback, btnRunRmanBackup, btnRunRmanRestore));
+
+            dgvAuditLog = new DataGridView
+            {
+                Dock = DockStyle.Fill,
+                ReadOnly = true,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false,
+                RowHeadersWidth = 51,
+            };
+
+            txtTask5Log = new TextBox
+            {
+                Dock = DockStyle.Bottom,
+                Height = 90,
+                Multiline = true,
+                ReadOnly = true,
+                ScrollBars = ScrollBars.Vertical,
+            };
+
+            tabTask5.Controls.Add(dgvAuditLog);
+            tabTask5.Controls.Add(txtTask5Log);
+            tabTask5.Controls.Add(topPanel);
+        }
+
+        private static void AddTask5Row(TableLayoutPanel panel, int row, string label1, Control control1, string label2, Control control2, string label3, Control control3)
+        {
+            panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 45));
+            panel.Controls.Add(new Label { Text = label1, TextAlign = ContentAlignment.MiddleLeft, Dock = DockStyle.Fill }, 0, row);
+            panel.Controls.Add(control1, 1, row);
+            panel.Controls.Add(new Label { Text = label2, TextAlign = ContentAlignment.MiddleLeft, Dock = DockStyle.Fill }, 2, row);
+            panel.Controls.Add(control2, 3, row);
+            panel.Controls.Add(new Label { Text = label3, TextAlign = ContentAlignment.MiddleLeft, Dock = DockStyle.Fill }, 4, row);
+            panel.Controls.Add(control3, 5, row);
+        }
+
+        private static FlowLayoutPanel CreateTask5Flow(params Control[] controls)
+        {
+            var flow = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = false, WrapContents = false };
+            foreach (Control control in controls)
+            {
+                control.Width = 150;
+                control.Height = 32;
+                flow.Controls.Add(control);
+            }
+            return flow;
+        }
+
+        private void btnTestConnection_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                OracleHelper.TestAdminConnection();
+                WriteTask5Log("Ket noi ADMIN_PHANHE1 thanh cong.");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Loi ket noi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                WriteTask5Log("Ket noi that bai: " + ex.Message);
+            }
+        }
+
+        private void btnLoadAudit_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                string query = @"
+SELECT *
+FROM (
+    SELECT ""LOAI_AUDIT"", ""NGUOI_DUNG"", ""THOI_GIAN"", ""HANH_DONG"",
+           ""DOI_TUONG"", ""CAU_LENH_SQL"", ""CHI_TIET_TRANG_THAI""
+    FROM ADMIN_PHANHE1.V_ALL_AUDIT_LOG
+    WHERE (:audit_type = 'ALL' OR ""LOAI_AUDIT"" = :audit_type)
+      AND (:audit_user IS NULL OR UPPER(""NGUOI_DUNG"") LIKE '%' || UPPER(:audit_user) || '%')
+      AND (:audit_object IS NULL OR UPPER(""DOI_TUONG"") LIKE '%' || UPPER(:audit_object) || '%')
+)
+WHERE ROWNUM <= :row_limit";
+
+                DataTable dt = new DataTable();
+                using (OracleConnection conn = new OracleConnection(OracleHelper.AdminConnectionString))
+                using (OracleCommand cmd = new OracleCommand(query, conn))
+                {
+                    cmd.BindByName = true;
+                    cmd.Parameters.Add("audit_type", OracleDbType.Varchar2).Value = cbAuditType.SelectedItem?.ToString() ?? "ALL";
+                    cmd.Parameters.Add("audit_user", OracleDbType.Varchar2).Value = string.IsNullOrWhiteSpace(txtAuditUser.Text) ? DBNull.Value : txtAuditUser.Text.Trim();
+                    cmd.Parameters.Add("audit_object", OracleDbType.Varchar2).Value = string.IsNullOrWhiteSpace(txtAuditObject.Text) ? DBNull.Value : txtAuditObject.Text.Trim();
+                    cmd.Parameters.Add("row_limit", OracleDbType.Int32).Value = (int)nudAuditLimit.Value;
+                    conn.Open();
+                    using (OracleDataAdapter adapter = new OracleDataAdapter(cmd))
+                    {
+                        adapter.Fill(dt);
+                    }
+                }
+
+                dgvAuditLog.DataSource = dt;
+                WriteTask5Log($"Da tai {dt.Rows.Count} dong audit log.");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Loi tai audit log", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                WriteTask5Log("Tai audit log that bai: " + ex.Message);
+            }
+        }
+
+        private void btnBackupDataPump_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                OracleHelper.ExecuteNonQuery("ADMIN_PHANHE1.SP_BACKUP_DATAPUMP", commandType: CommandType.StoredProcedure);
+                WriteTask5Log("Da gui job backup Data Pump. File .dmp nam trong Oracle DIRECTORY BACKUP_DIR.");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Loi backup Data Pump", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                WriteTask5Log("Backup Data Pump that bai: " + ex.Message);
+            }
+        }
+
+        private void btnRestoreDataPump_Click(object sender, EventArgs e)
+        {
+            string fileName = txtRestoreFile.Text.Trim();
+            string tableName = txtRestoreTable.Text.Trim();
+            if (string.IsNullOrWhiteSpace(fileName))
+            {
+                MessageBox.Show("Nhap ten file .dmp can restore.", "Thieu thong tin", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (MessageBox.Show($"Restore tu file {fileName}?", "Xac nhan restore", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+                return;
+
+            try
+            {
+                OracleHelper.ExecuteNonQuery(
+                    "ADMIN_PHANHE1.SP_RESTORE_DATAPUMP",
+                    new Dictionary<string, object>
+                    {
+                        ["p_filename"] = fileName,
+                        ["p_table_name"] = string.IsNullOrWhiteSpace(tableName) ? DBNull.Value : tableName
+                    },
+                    CommandType.StoredProcedure);
+                WriteTask5Log("Da gui job restore Data Pump.");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Loi restore Data Pump", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                WriteTask5Log("Restore Data Pump that bai: " + ex.Message);
+            }
+        }
+
+        private void btnRestoreFlashback_Click(object sender, EventArgs e)
+        {
+            string tableName = cbFlashbackTable.SelectedItem?.ToString() ?? "";
+            string safeTime = $"{dtpFlashbackDate.Value:yyyy-MM-dd} {txtFlashbackTime.Text.Trim()}";
+            if (!DateTime.TryParseExact(safeTime, "yyyy-MM-dd HH:mm:ss", null, System.Globalization.DateTimeStyles.None, out _))
+            {
+                MessageBox.Show("Nhap gio theo dinh dang HH:mm:ss.", "Sai dinh dang", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (MessageBox.Show($"Flashback {tableName} ve {safeTime}?", "Xac nhan flashback", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+                return;
+
+            try
+            {
+                OracleHelper.ExecuteNonQuery(
+                    "ADMIN_PHANHE1.SP_RESTORE_FLASHBACK",
+                    new Dictionary<string, object>
+                    {
+                        ["p_table_name"] = tableName,
+                        ["p_safe_time"] = safeTime
+                    },
+                    CommandType.StoredProcedure);
+                WriteTask5Log($"Da flashback {tableName} ve {safeTime}.");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Loi flashback", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                WriteTask5Log("Flashback that bai: " + ex.Message);
+            }
+        }
+
+        private void RunBatchScript(string scriptName)
+        {
+            string scriptPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, scriptName));
+            if (!File.Exists(scriptPath))
+                scriptPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "backup_restore", "window", scriptName));
+
+            if (!File.Exists(scriptPath))
+            {
+                MessageBox.Show($"Khong tim thay {scriptName}. Hay copy file .bat vao thu muc chua ADMIN.exe hoac giu dung cau truc repo.", "Thieu file", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = scriptPath,
+                UseShellExecute = true,
+                WorkingDirectory = Path.GetDirectoryName(scriptPath) ?? AppContext.BaseDirectory
+            });
+            WriteTask5Log("Da mo script: " + scriptPath);
+        }
+
+        private void WriteTask5Log(string message)
+        {
+            txtTask5Log.AppendText($"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}");
         }
     }
 }

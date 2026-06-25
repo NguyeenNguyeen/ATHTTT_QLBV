@@ -41,20 +41,20 @@ namespace ADMIN
             }
 
             // Sửa lại connection string
-            string connStringXepdb1 = $"User Id={username};Password={password};{dbaPriv}Data Source=" +
-                "(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))" +
-                "(CONNECT_DATA=(SERVICE_NAME=xepdb1)));";  // ✅ xepdb1 thay vì orclpdb1
+            string connStringXepdb1 = OracleConnectionConfig.BuildConnectionString(username, password, OracleConnectionConfig.LoginServiceName, !string.IsNullOrEmpty(dbaPriv));
 
-            string connStringXe = $"User Id={username};Password={password};{dbaPriv}Data Source=" +
-                "(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))" +
-                "(CONNECT_DATA=(SERVICE_NAME=orcl21)));";  // ✅ Cái này đúng rồi
+            string connStringXe = OracleConnectionConfig.BuildConnectionString(username, password, OracleConnectionConfig.AdminServiceName, !string.IsNullOrEmpty(dbaPriv));
 
             OracleConnection conn = null;
             string finalConnString = "";
+            WriteLoginLog(
+                $"Login attempt user={username}\n" +
+                $"LoginConnection={MaskPassword(connStringXepdb1)}\n" +
+                $"AdminConnection={MaskPassword(connStringXe)}");
 
             try
             {
-                // 1. Thử kết nối với xepdb1 trước (Dành cho U1-U8 và OLS)
+                // 1. Thử kết nối với PDB cấu hình cho login trước (Dành cho U1-U8 và OLS)
                 conn = new OracleConnection(connStringXepdb1);
                 conn.Open();
                 finalConnString = connStringXepdb1;
@@ -86,16 +86,14 @@ namespace ADMIN
             catch (OracleException ex)
             {
                 if (conn != null) { conn.Dispose(); }
-                string logPath = System.IO.Path.Combine(@"n:\ATBMHTTT\FixLanCUoi\ATHTTT_QLBV\ADMIN", "login_error_log.txt");
-                System.IO.File.WriteAllText(logPath, $"OracleException: {ex.Number}\nMessage: {ex.Message}\nStack: {ex.StackTrace}\nInner: {ex.InnerException?.Message}\nConnStringXepdb1: {connStringXepdb1}\nConnStringXe: {connStringXe}");
+                WriteLoginLog($"OracleException: {ex.Number}\nMessage: {ex.Message}\nStack: {ex.StackTrace}\nInner: {ex.InnerException?.Message}\nConnStringXepdb1: {MaskPassword(connStringXepdb1)}\nConnStringXe: {MaskPassword(connStringXe)}");
                 MessageBox.Show($"Lỗi kết nối cơ sở dữ liệu ({ex.Number}):\n{ex.Message}\n\nChi tiết lỗi đã được ghi vào login_error_log.txt", "Lỗi Hệ Thống", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
             catch (Exception ex)
             {
                 if (conn != null) { conn.Dispose(); }
-                string logPath = System.IO.Path.Combine(@"n:\ATBMHTTT\FixLanCUoi\ATHTTT_QLBV\ADMIN", "login_error_log.txt");
-                System.IO.File.WriteAllText(logPath, $"SystemException: {ex.Message}\nStack: {ex.StackTrace}\nInner: {ex.InnerException?.Message}");
+                WriteLoginLog($"SystemException: {ex.Message}\nStack: {ex.StackTrace}\nInner: {ex.InnerException?.Message}\nConnStringXepdb1: {MaskPassword(connStringXepdb1)}\nConnStringXe: {MaskPassword(connStringXe)}");
                 MessageBox.Show($"Lỗi Hệ Thống: {ex.Message}\n\nChi tiết lỗi đã được ghi vào login_error_log.txt", "Lỗi Hệ Thống", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
@@ -191,8 +189,7 @@ namespace ADMIN
             }
             catch (Exception ex)
             {
-                string logPath = System.IO.Path.Combine(@"n:\ATBMHTTT\FixLanCUoi\ATHTTT_QLBV\ADMIN", "login_error_log.txt");
-                System.IO.File.AppendAllText(logPath, $"\nGetUserRole Exception: {ex.Message}\nStack: {ex.StackTrace}");
+                WriteLoginLog($"GetUserRole Exception: {ex.Message}\nStack: {ex.StackTrace}");
 
                 string accountCode = StripCommonUserPrefix(username.Trim().ToUpper());
                 if (accountCode.Contains("ADMIN") || accountCode == "SYS" || accountCode == "SYSTEM")
@@ -281,13 +278,11 @@ namespace ADMIN
                 {
                     while (rAll.Read()) { allRoles.Add(rAll.GetString(0)); }
                 }
-                string logPath = System.IO.Path.Combine(@"n:\ATBMHTTT\FixLanCUoi\ATHTTT_QLBV\ADMIN", "login_error_log.txt");
-                System.IO.File.AppendAllText(logPath, $"\n[{DateTime.Now}] Active session roles for connection: " + string.Join(", ", allRoles));
+                WriteLoginLog("Active session roles for connection: " + string.Join(", ", allRoles));
             }
             catch (Exception ex)
             {
-                string logPath = System.IO.Path.Combine(@"n:\ATBMHTTT\FixLanCUoi\ATHTTT_QLBV\ADMIN", "login_error_log.txt");
-                System.IO.File.AppendAllText(logPath, $"\n[{DateTime.Now}] Error listing session roles: {ex.Message}");
+                WriteLoginLog($"Error listing session roles: {ex.Message}");
             }
 
             const string query = @"
@@ -313,6 +308,21 @@ namespace ADMIN
             }
 
             return "";
+        }
+
+        private static void WriteLoginLog(string message)
+        {
+            string logPath = System.IO.Path.Combine(AppContext.BaseDirectory, "login_error_log.txt");
+            System.IO.File.AppendAllText(logPath, $"{Environment.NewLine}[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}{Environment.NewLine}");
+        }
+
+        private static string MaskPassword(string connectionString)
+        {
+            return System.Text.RegularExpressions.Regex.Replace(
+                connectionString,
+                "(Password=)([^;]*)",
+                "$1***",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         }
     }
 }

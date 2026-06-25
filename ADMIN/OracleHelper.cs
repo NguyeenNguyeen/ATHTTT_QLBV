@@ -5,8 +5,38 @@ namespace ADMIN
 {
     public static class OracleHelper
     {
-        public static readonly string AdminConnectionString = 
-            @"User Id=ADMIN_PHANHE1;Password=Admin@123456;Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=orcl21)));";
+        public static readonly string AdminConnectionString = OracleConnectionConfig.BuildAdminConnectionString();
+
+        public static void TestAdminConnection()
+        {
+            using (OracleConnection conn = new OracleConnection(AdminConnectionString))
+            {
+                conn.Open();
+            }
+        }
+
+        public static void ExecuteNonQuery(string commandText, Dictionary<string, object> parameters = null, CommandType commandType = CommandType.Text)
+        {
+            using (OracleConnection conn = new OracleConnection(AdminConnectionString))
+            {
+                conn.Open();
+                using (OracleCommand cmd = new OracleCommand(commandText, conn))
+                {
+                    cmd.BindByName = true;
+                    cmd.CommandType = commandType;
+
+                    if (parameters != null)
+                    {
+                        foreach (var param in parameters)
+                        {
+                            cmd.Parameters.Add(param.Key, OracleDbType.Varchar2).Value = param.Value ?? DBNull.Value;
+                        }
+                    }
+
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
 
         public static void ExecuteStoredProcedure(string procedureName, Dictionary<string, object> parameters)
         {
