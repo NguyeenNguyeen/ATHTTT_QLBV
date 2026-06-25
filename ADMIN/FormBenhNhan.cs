@@ -6,11 +6,12 @@ using Oracle.ManagedDataAccess.Client;
 
 namespace ADMIN
 {
-    public class FormBenhNhan : Form
+    public class FormBenhNhan : Form, ILogoutAwareForm
     {
         private readonly OracleConnection _conn;
         private readonly string _username;
         private readonly string _displayName;
+        public bool LogoutRequested { get; private set; }
 
         private DataGridView dgvProfile = null!;
 
@@ -56,6 +57,21 @@ namespace ADMIN
             };
             panelHeader.Controls.Add(lblStatus);
 
+            Button btnLogout = new Button
+            {
+                Text = "Đăng xuất",
+                ForeColor = Color.White,
+                BackColor = Color.FromArgb(192, 57, 43),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                Size = new Size(110, 34),
+                Location = new Point(panelHeader.Width - 130, 15),
+                Anchor = AnchorStyles.Top | AnchorStyles.Right
+            };
+            btnLogout.FlatAppearance.BorderSize = 0;
+            btnLogout.Click += BtnLogout_Click;
+            panelHeader.Controls.Add(btnLogout);
+
             Panel panelTop = new Panel { Dock = DockStyle.Top, Height = 54 };
             Controls.Add(panelTop);
             panelTop.BringToFront();
@@ -81,6 +97,24 @@ namespace ADMIN
             };
             Controls.Add(dgvProfile);
             dgvProfile.BringToFront();
+        }
+
+        private void BtnLogout_Click(object sender, EventArgs e)
+        {
+            if (MessageBox.Show("Bạn có chắc muốn đăng xuất?", "Đăng xuất", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+                return;
+
+            LogoutRequested = true;
+            try
+            {
+                if (_conn.State == ConnectionState.Open)
+                    _conn.Close();
+            }
+            catch
+            {
+            }
+
+            Close();
         }
 
         private Button CreateButton(string text, Point location, Color color, int width = 100)

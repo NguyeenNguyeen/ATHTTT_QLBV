@@ -6,11 +6,12 @@ using Oracle.ManagedDataAccess.Client;
 
 namespace ADMIN
 {
-    public class FormDieuPhoiVien : Form
+    public class FormDieuPhoiVien : Form, ILogoutAwareForm
     {
         private OracleConnection _conn;
         private string _username;
         private string _displayName;
+        public bool LogoutRequested { get; private set; }
 
         // UI Controls
         private TabControl tabControl;
@@ -73,6 +74,21 @@ namespace ADMIN
             };
             panelHeader.Controls.Add(lblStatus);
 
+            Button btnLogout = new Button
+            {
+                Text = "Đăng xuất",
+                ForeColor = Color.White,
+                BackColor = Color.FromArgb(192, 57, 43),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                Size = new Size(110, 34),
+                Location = new Point(panelHeader.Width - 130, 15),
+                Anchor = AnchorStyles.Top | AnchorStyles.Right
+            };
+            btnLogout.FlatAppearance.BorderSize = 0;
+            btnLogout.Click += BtnLogout_Click;
+            panelHeader.Controls.Add(btnLogout);
+
             // TabControl
             tabControl = new TabControl
             {
@@ -96,6 +112,24 @@ namespace ADMIN
             tabKTV = new TabPage("ĐIỀU PHỐI KỸ THUẬT VIÊN") { Padding = new Padding(10) };
             tabControl.TabPages.Add(tabKTV);
             SetupTabKTV();
+        }
+
+        private void BtnLogout_Click(object sender, EventArgs e)
+        {
+            if (MessageBox.Show("Bạn có chắc muốn đăng xuất?", "Đăng xuất", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+                return;
+
+            LogoutRequested = true;
+            try
+            {
+                if (_conn.State == ConnectionState.Open)
+                    _conn.Close();
+            }
+            catch
+            {
+            }
+
+            Close();
         }
 
         #region TAB 1: QUẢN LÝ BỆNH NHÂN

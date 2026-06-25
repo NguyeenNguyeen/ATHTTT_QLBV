@@ -1401,8 +1401,6 @@ BEGIN
         RETURN '1=1';
     END IF;
 
-    
-
     v_manv := v_session_user;
 
     SELECT VAITRO INTO v_vaitro
@@ -1434,18 +1432,45 @@ CREATE OR REPLACE FUNCTION ADMIN_PHANHE1.FN_VPD_BENHNHAN (
 ) RETURN VARCHAR2
 AS
     v_session_user VARCHAR2(128);
+    v_app_user VARCHAR2(128);
+    v_role_count NUMBER;
     v_manv   VARCHAR2(20);
     v_vaitro NVARCHAR2(50);
 BEGIN
     v_session_user := SYS_CONTEXT('USERENV', 'SESSION_USER');
+    v_app_user := v_session_user;
+
+    IF v_app_user LIKE 'C##%' THEN
+        v_app_user := SUBSTR(v_app_user, 4);
+    END IF;
 
     IF v_session_user IN ('ADMIN_PHANHE1', 'SYS', 'SYSTEM') THEN
         RETURN '1=1';
     END IF;
 
-    
+    IF REGEXP_LIKE(UPPER(v_app_user), '^BN[0-9]+$') THEN
+        RETURN 'MABN = ''' || REPLACE(UPPER(v_app_user), '''', '''''') || '''';
+    END IF;
 
-    v_manv := v_session_user;
+    SELECT COUNT(*) INTO v_role_count
+    FROM DBA_ROLE_PRIVS
+    WHERE GRANTEE IN (UPPER(v_session_user), UPPER(v_app_user))
+      AND GRANTED_ROLE = 'ROLE_DIEU_PHOI_VIEN';
+
+    IF v_role_count > 0 THEN
+        RETURN '1=1';
+    END IF;
+
+    SELECT COUNT(*) INTO v_role_count
+    FROM DBA_ROLE_PRIVS
+    WHERE GRANTEE IN (UPPER(v_session_user), UPPER(v_app_user))
+      AND GRANTED_ROLE = 'ROLE_BAC_SI';
+
+    IF v_role_count > 0 THEN
+        RETURN 'MABN IN (SELECT MABN FROM ADMIN_PHANHE1.HSBA WHERE MABS = ''' || REPLACE(UPPER(v_app_user), '''', '''''') || ''')';
+    END IF;
+
+    v_manv := v_app_user;
 
     SELECT VAITRO INTO v_vaitro
     FROM ADMIN_PHANHE1.NHANVIEN
@@ -2074,6 +2099,8 @@ EXCEPTION
         IF SQLCODE != -1921 THEN RAISE; END IF;
 END;
 /
+
+GRANT ROLE_BENHNHAN TO ADMIN_PHANHE1 WITH ADMIN OPTION;
 
 CREATE OR REPLACE VIEW ADMIN_PHANHE1.V_RBAC_KTV_THONGTIN AS
 SELECT MANV, HOTEN, PHAI, NGAYSINH, CMND, QUEQUAN, SODT, VAITRO, CHUYENKHOA, COSO

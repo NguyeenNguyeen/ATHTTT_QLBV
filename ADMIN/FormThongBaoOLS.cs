@@ -6,7 +6,7 @@ using Oracle.ManagedDataAccess.Client;
 
 namespace ADMIN
 {
-    public class FormThongBaoOLS : Form
+    public class FormThongBaoOLS : Form, ILogoutAwareForm
     {
         private OracleConnection _conn;
         private string _username;
@@ -15,6 +15,8 @@ namespace ADMIN
         private Label lblGreeting;
         private Button btnViewAnnouncements;
         private Button btnLogout;
+
+        public bool LogoutRequested { get; private set; }
 
         public FormThongBaoOLS(string username, string displayName, OracleConnection conn)
         {
@@ -27,12 +29,11 @@ namespace ADMIN
 
         private void InitializeComponent()
         {
-            this.Text = "Hệ thống Bệnh viện";
-            this.Size = new Size(1100, 680);
-            this.StartPosition = FormStartPosition.CenterScreen;
-            this.BackColor = Color.FromArgb(245, 247, 250); // Nền xám nhạt hiện đại
+            Text = "Hệ thống Bệnh viện";
+            Size = new Size(1100, 680);
+            StartPosition = FormStartPosition.CenterScreen;
+            BackColor = Color.FromArgb(245, 247, 250);
 
-            // Header Panel
             Panel topPanel = new Panel
             {
                 Dock = DockStyle.Top,
@@ -40,44 +41,41 @@ namespace ADMIN
                 BackColor = Color.White,
                 Padding = new Padding(10)
             };
-            this.Controls.Add(topPanel);
+            Controls.Add(topPanel);
 
-            // ĐĂNG XUẤT Button
             btnLogout = new Button
             {
-                Text = "ĐĂNG XUẤT",
+                Text = "Đăng xuất",
                 Font = new Font("Segoe UI", 10, FontStyle.Bold),
                 Size = new Size(130, 45),
                 Location = new Point(930, 17),
                 Anchor = AnchorStyles.Top | AnchorStyles.Right,
                 FlatStyle = FlatStyle.Flat,
-                BackColor = Color.FromArgb(231, 76, 60), // Nút đỏ
+                BackColor = Color.FromArgb(231, 76, 60),
                 ForeColor = Color.White
             };
             btnLogout.FlatAppearance.BorderSize = 0;
             btnLogout.Click += BtnLogout_Click;
             topPanel.Controls.Add(btnLogout);
 
-            // Xem bảng "Thông báo" Button
             btnViewAnnouncements = new Button
             {
-                Text = "XEM BẢNG THÔNG BÁO",
+                Text = "Xem thông báo",
                 Font = new Font("Segoe UI", 10, FontStyle.Bold),
                 Size = new Size(220, 45),
                 Location = new Point(690, 17),
                 Anchor = AnchorStyles.Top | AnchorStyles.Right,
                 FlatStyle = FlatStyle.Flat,
-                BackColor = Color.FromArgb(52, 152, 219), // Nút xanh
+                BackColor = Color.FromArgb(52, 152, 219),
                 ForeColor = Color.White
             };
             btnViewAnnouncements.FlatAppearance.BorderSize = 0;
             btnViewAnnouncements.Click += BtnViewAnnouncements_Click;
             topPanel.Controls.Add(btnViewAnnouncements);
 
-            // XIN CHÀO Label
             lblGreeting = new Label
             {
-                Text = $"XIN CHÀO {_username.ToUpper()}!",
+                Text = $"Xin chào {_username.ToUpper()}!",
                 Font = new Font("Segoe UI", 12, FontStyle.Bold),
                 ForeColor = Color.FromArgb(44, 62, 80),
                 AutoSize = true,
@@ -85,17 +83,15 @@ namespace ADMIN
                 Anchor = AnchorStyles.Top | AnchorStyles.Right
             };
             topPanel.Controls.Add(lblGreeting);
-            
-            // Add a separator line below the top panel
+
             Panel separator = new Panel
             {
                 Dock = DockStyle.Top,
                 Height = 2,
                 BackColor = Color.FromArgb(220, 224, 229)
             };
-            this.Controls.Add(separator);
+            Controls.Add(separator);
 
-            // Dòng chữ chào mừng ở giữa màn hình
             Label lblWelcome = new Label
             {
                 Text = "HỆ THỐNG QUẢN LÝ BỆNH VIỆN",
@@ -105,7 +101,7 @@ namespace ADMIN
                 Location = new Point(250, 300),
                 Anchor = AnchorStyles.None
             };
-            this.Controls.Add(lblWelcome);
+            Controls.Add(lblWelcome);
         }
 
         private void BtnViewAnnouncements_Click(object sender, EventArgs e)
@@ -116,47 +112,20 @@ namespace ADMIN
 
         private void BtnLogout_Click(object sender, EventArgs e)
         {
-            var result = MessageBox.Show("Bạn có thực sự muốn đăng xuất?", "Đăng xuất", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-            if (result == DialogResult.Yes)
+            if (MessageBox.Show("Bạn có chắc muốn đăng xuất?", "Đăng xuất", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+                return;
+
+            LogoutRequested = true;
+            try
             {
-                try
-                {
-                    if (_conn != null && _conn.State == ConnectionState.Open)
-                    {
-                        _conn.Close();
-                    }
-                }
-                catch { }
-                
-                this.Hide();
-                using (LoginForm loginForm = new LoginForm())
-                {
-                    if (loginForm.ShowDialog() == DialogResult.OK)
-                    {
-                        if (LoginForm.UserRole == "DOCTOR")
-                        {
-                            FormBacSi formBacSi = new FormBacSi(LoginForm.LoggedInUsername, LoginForm.DoctorName, LoginForm.DoctorConnection);
-                            formBacSi.ShowDialog();
-                        }
-                        else if (LoginForm.UserRole == "DISPATCHER")
-                        {
-                            FormDieuPhoiVien formDieuPhoiVien = new FormDieuPhoiVien(LoginForm.LoggedInUsername, LoginForm.DoctorName, LoginForm.DoctorConnection);
-                            formDieuPhoiVien.ShowDialog();
-                        }
-                        else if (LoginForm.UserRole == "OLS_USER")
-                        {
-                            FormThongBaoOLS formOls = new FormThongBaoOLS(LoginForm.LoggedInUsername, LoginForm.DoctorName, LoginForm.DoctorConnection);
-                            formOls.ShowDialog();
-                        }
-                        else
-                        {
-                            Form1 formAdmin = new Form1();
-                            formAdmin.ShowDialog();
-                        }
-                    }
-                }
-                this.Close();
+                if (_conn.State == ConnectionState.Open)
+                    _conn.Close();
             }
+            catch
+            {
+            }
+
+            Close();
         }
     }
 }

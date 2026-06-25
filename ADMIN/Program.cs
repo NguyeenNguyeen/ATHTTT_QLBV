@@ -13,73 +13,33 @@ namespace ADMIN
             {
                 ApplicationConfiguration.Initialize();
 
-                // Hiển thị form đăng nhập cũ
-                System.IO.File.AppendAllText("debug_log.txt", "Showing LoginForm...\n");
-                using (LoginForm loginForm = new LoginForm())
+                bool shouldShowLogin = true;
+                while (shouldShowLogin)
                 {
-                    if (loginForm.ShowDialog() == DialogResult.OK)
+                    shouldShowLogin = false;
+                    System.IO.File.AppendAllText("debug_log.txt", "Showing LoginForm...\n");
+
+                    using LoginForm loginForm = new LoginForm();
+                    if (loginForm.ShowDialog() != DialogResult.OK)
                     {
-                        System.IO.File.AppendAllText("debug_log.txt", $"Login OK. Role: '{LoginForm.UserRole}'\n");
-                        if (LoginForm.UserRole == "DOCTOR")
-                        {
-                            FormBacSi formBacSi = new FormBacSi(
-                                LoginForm.LoggedInUsername,
-                                LoginForm.DoctorName,
-                                LoginForm.DoctorConnection
-                            );
-                            Application.Run(formBacSi);
-                        }
-                        else if (LoginForm.UserRole == "DISPATCHER")
-                        {
-                            FormDieuPhoiVien formDieuPhoiVien = new FormDieuPhoiVien(
-                                LoginForm.LoggedInUsername,
-                                LoginForm.DoctorName,
-                                LoginForm.DoctorConnection
-                            );
-                            Application.Run(formDieuPhoiVien);
-                        }
-                        else if (LoginForm.UserRole == "TECHNICIAN")
-                        {
-                            FormKyThuatVien formKyThuatVien = new FormKyThuatVien(
-                                LoginForm.LoggedInUsername,
-                                LoginForm.DoctorName,
-                                LoginForm.DoctorConnection
-                            );
-                            Application.Run(formKyThuatVien);
-                        }
-                        else if (LoginForm.UserRole == "PATIENT")
-                        {
-                            FormBenhNhan formBenhNhan = new FormBenhNhan(
-                                LoginForm.LoggedInUsername,
-                                LoginForm.DoctorName,
-                                LoginForm.DoctorConnection
-                            );
-                            Application.Run(formBenhNhan);
-                        }
-                        else if (LoginForm.UserRole == "OLS_USER")
-                        {
-                            System.IO.File.AppendAllText("debug_log.txt", "Creating FormThongBaoOLS...\n");
-                            FormThongBaoOLS formOls = new FormThongBaoOLS(
-                                LoginForm.LoggedInUsername,
-                                LoginForm.DoctorName,
-                                LoginForm.DoctorConnection
-                            );
-                            System.IO.File.AppendAllText("debug_log.txt", "Running FormThongBaoOLS...\n");
-                            Application.Run(formOls);
-                            System.IO.File.AppendAllText("debug_log.txt", "FormThongBaoOLS closed normally.\n");
-                        }
-                        else
-                        {
-                            System.IO.File.AppendAllText("debug_log.txt", "Creating Form1...\n");
-                            // Mở form chính cho admin/users khác
-                            Application.Run(new Form1());
-                        }
+                        System.IO.File.AppendAllText("debug_log.txt", "Login cancelled or closed.\n");
+                        break;
+                    }
+
+                    System.IO.File.AppendAllText("debug_log.txt", $"Login OK. Role: '{LoginForm.UserRole}'\n");
+
+                    using Form mainForm = CreateMainForm();
+                    Application.Run(mainForm);
+
+                    if (mainForm is ILogoutAwareForm logoutAware && logoutAware.LogoutRequested)
+                    {
+                        System.IO.File.AppendAllText("debug_log.txt", "Logout requested. Returning to LoginForm...\n");
+                        CloseCurrentLoginConnection();
+                        shouldShowLogin = true;
                     }
                     else
                     {
-                        System.IO.File.AppendAllText("debug_log.txt", "Login cancelled or closed.\n");
-                        // Nếu người dùng ấn Thoát / Tắt form, đóng ứng dụng
-                        Application.Exit();
+                        CloseCurrentLoginConnection();
                     }
                 }
             }
@@ -87,6 +47,46 @@ namespace ADMIN
             {
                 System.IO.File.AppendAllText("debug_log.txt", $"Exception: {ex.Message}\n{ex.StackTrace}\n");
                 MessageBox.Show($"Lỗi nghiêm trọng: {ex.Message}\n\nStackTrace:\n{ex.StackTrace}", "Crash", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private static Form CreateMainForm()
+        {
+            return LoginForm.UserRole switch
+            {
+                "DOCTOR" => new FormBacSi(
+                    LoginForm.LoggedInUsername,
+                    LoginForm.DoctorName,
+                    LoginForm.DoctorConnection),
+                "DISPATCHER" => new FormDieuPhoiVien(
+                    LoginForm.LoggedInUsername,
+                    LoginForm.DoctorName,
+                    LoginForm.DoctorConnection),
+                "TECHNICIAN" => new FormKyThuatVien(
+                    LoginForm.LoggedInUsername,
+                    LoginForm.DoctorName,
+                    LoginForm.DoctorConnection),
+                "PATIENT" => new FormBenhNhan(
+                    LoginForm.LoggedInUsername,
+                    LoginForm.DoctorName,
+                    LoginForm.DoctorConnection),
+                "OLS_USER" => new FormThongBaoOLS(
+                    LoginForm.LoggedInUsername,
+                    LoginForm.DoctorName,
+                    LoginForm.DoctorConnection),
+                _ => new Form1()
+            };
+        }
+
+        private static void CloseCurrentLoginConnection()
+        {
+            try
+            {
+                LoginForm.DoctorConnection?.Close();
+                LoginForm.DoctorConnection?.Dispose();
+            }
+            catch
+            {
             }
         }
     }

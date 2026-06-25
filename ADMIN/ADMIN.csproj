@@ -12,4 +12,9 @@
     <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="23.26.200" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="run_rman_backup.bat" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="run_rman_restore.bat" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

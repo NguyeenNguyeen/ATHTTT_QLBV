@@ -5,10 +5,11 @@ using Oracle.ManagedDataAccess.Client;
 
 namespace ADMIN
 {
-    public partial class Form1 : Form
+    public partial class Form1 : Form, ILogoutAwareForm
     {
         private static readonly Regex OracleIdentifierRegex = new("^[A-Za-z][A-Za-z0-9_$#]*$", RegexOptions.Compiled);
         private PermissionManager _permManager = new PermissionManager();
+        public bool LogoutRequested { get; private set; }
         private TabPage tabTask5;
         private DataGridView dgvAuditLog;
         private TextBox txtAuditUser;
@@ -630,9 +631,46 @@ namespace ADMIN
         public Form1()
         {
             InitializeComponent();
+            AddLogoutBar();
             LoadGranteeList();
             InitializePermissionLevelControls();
             InitializeTask5Controls();
+        }
+
+        private void AddLogoutBar()
+        {
+            Panel panelLogout = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 46,
+                BackColor = Color.WhiteSmoke
+            };
+
+            Button btnLogout = new Button
+            {
+                Text = "Đăng xuất",
+                ForeColor = Color.White,
+                BackColor = Color.FromArgb(192, 57, 43),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                Size = new Size(110, 32),
+                Location = new Point(panelLogout.Width - 126, 7),
+                Anchor = AnchorStyles.Top | AnchorStyles.Right
+            };
+            btnLogout.FlatAppearance.BorderSize = 0;
+            btnLogout.Click += BtnLogout_Click;
+
+            panelLogout.Controls.Add(btnLogout);
+            Controls.Add(panelLogout);
+        }
+
+        private void BtnLogout_Click(object sender, EventArgs e)
+        {
+            if (MessageBox.Show("Bạn có chắc muốn đăng xuất?", "Đăng xuất", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+                return;
+
+            LogoutRequested = true;
+            Close();
         }
 
         private void InitializePermissionLevelControls()
@@ -710,7 +748,17 @@ namespace ADMIN
             btnRunRmanBackup = new Button { Text = "Backup RMAN", BackColor = Color.LightGreen, Width = 150, Height = 36 };
             btnRunRmanBackup.Click += (s, e) => RunBatchScript("run_rman_backup.bat");
             btnRunRmanRestore = new Button { Text = "Restore RMAN", BackColor = Color.LightCoral, Width = 150, Height = 36 };
-            btnRunRmanRestore.Click += (s, e) => RunBatchScript("run_rman_restore.bat");
+            btnRunRmanRestore.Click += (s, e) =>
+            {
+                if (MessageBox.Show(
+                        "RMAN restore se tat database va khoi phuc du lieu tu backup. Ban co chac chan muon chay?",
+                        "Xac nhan RMAN restore",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Warning) == DialogResult.Yes)
+                {
+                    RunBatchScript("run_rman_restore.bat", "--yes");
+                }
+            };
 
             txtDataPumpDirectory = new TextBox { Text = @"C:\Backup_Oracle", Width = 460 };
             btnChooseDataPumpDirectory = new Button { Text = "Chon thu muc", Width = 120, Height = 32 };
@@ -1094,25 +1142,33 @@ WHERE ROWNUM <= :row_limit";
             }
         }
 
-        private void RunBatchScript(string scriptName)
+        private void RunBatchScript(string scriptName, string arguments = "")
         {
-            string scriptPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, scriptName));
-            if (!File.Exists(scriptPath))
-                scriptPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "backup_restore", "window", scriptName));
+            string scriptPath = GetAdminBatchScriptPath(scriptName);
 
             if (!File.Exists(scriptPath))
             {
-                MessageBox.Show($"Khong tim thay {scriptName}. Hay copy file .bat vao thu muc chua ADMIN.exe hoac giu dung cau truc repo.", "Thieu file", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show($"Khong tim thay ADMIN\\{scriptName}. Hay dam bao file .bat nam trong thu muc ADMIN.", "Thieu file", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             Process.Start(new ProcessStartInfo
             {
                 FileName = scriptPath,
+                Arguments = arguments,
                 UseShellExecute = true,
                 WorkingDirectory = Path.GetDirectoryName(scriptPath) ?? AppContext.BaseDirectory
             });
             WriteTask5Log("Da mo script: " + scriptPath);
+        }
+
+        private static string GetAdminBatchScriptPath(string scriptName)
+        {
+            string outputPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, scriptName));
+            if (File.Exists(outputPath))
+                return outputPath;
+
+            return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", scriptName));
         }
 
         private void WriteTask5Log(string message)
